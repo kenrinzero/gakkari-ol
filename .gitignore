@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+
+# Runtime data
+data/
+
+# NEXT.md is a session log for internal use only
+NEXT.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Editor
+.vscode/
+.idea/
+*.swp
