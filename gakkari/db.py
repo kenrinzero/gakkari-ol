@@ -86,9 +86,13 @@ def get_conn():
 def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
-        conn.execute(
-            "INSERT OR IGNORE INTO settings (id) VALUES (1)"
-        )
+        conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
+        try:
+            conn.execute(
+                "ALTER TABLE settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"
+            )
+        except sqlite3.OperationalError:
+            pass
 
 
 # ── Subscriptions ────────────────────────────────────────────────────────────
@@ -159,6 +163,7 @@ def load_settings(conn: sqlite3.Connection) -> Settings:
         due_soon_days=row["due_soon_days"],
         mascot_enabled=bool(row["mascot_enabled"]),
         notices_enabled=bool(row["notices_enabled"]),
+        language=row["language"],
     )
 
 
@@ -166,8 +171,8 @@ def save_settings(conn: sqlite3.Connection, s: Settings) -> None:
     conn.execute(
         """UPDATE settings SET
            base_currency=?, price_display_mode=?, due_soon_days=?,
-           mascot_enabled=?, notices_enabled=?
+           mascot_enabled=?, notices_enabled=?, language=?
            WHERE id=1""",
         (s.base_currency, s.price_display_mode, s.due_soon_days,
-         int(s.mascot_enabled), int(s.notices_enabled)),
+         int(s.mascot_enabled), int(s.notices_enabled), s.language),
     )

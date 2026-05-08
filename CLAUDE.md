@@ -118,14 +118,15 @@ with get_conn() as conn:
 
 **Phases 1 and 2 are the finished product.** Everything after is optional polish.
 
-### Current state (after bootstrap session)
+### Current state (after Session 4 — aesthetic overhaul)
 
-- Venv set up, all dependencies installed (`textual 8.2.5`, `httpx`, `textual-dev`).
-- Full DB schema defined and tested.
-- `Subscription` and `Settings` models complete including tax helpers.
-- `MainScreen` renders a hardcoded three-row sample table with due-soon highlighting.
-- Keyboard bindings (`a` add, `e` edit, `d` delete, `q` quit, `?` help) are wired to the footer; add/edit/delete actions are stubs that show a notification.
-- Next session should replace hardcoded rows with real DB reads and implement the add/edit modal flow.
+- Visual identity locked in: PC-9800/CRT aesthetic — black terminal surround, amber DataTable panel, double-line borders.
+- `gakkari/strings.py` — full i18n module. EN and JA string tables. Helpers: `t()`, `fmt_date()`, `fmt_period()`, `fmt_status()`, `fmt_tax_mode()`, `fmt_category()`. Language toggle (`L` key) persists to `Settings.language` in SQLite.
+- `MainScreen` layout: transposed DataTable (subscriptions as columns, field names as rows), separator columns between subscriptions, detail pane below showing selected subscription's full info, split lower section with summary pane (count + monthly/yearly estimate) and notes pane.
+- DataTable: `cursor_type="column"`, cursor skips separator columns automatically, column headers are subscription names, rows are field values.
+- **`_SAMPLE_SUBS` is still hardcoded** — real DB reads not yet wired in this design.
+- **add/edit/delete are stubs** (show notification only). Modal files from Session 2 (`confirm_modal.py`, `subscription_modal.py`) may exist in the project and can be reused.
+- Next session: replace sample data with real DB reads, wire CRUD modals into the new layout. Goal is a fully functional app by end of that session.
 
 ---
 

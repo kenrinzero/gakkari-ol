@@ -51,4 +51,5 @@ class Settings:
     due_soon_days: int = 7
     mascot_enabled: bool = True
     notices_enabled: bool = True
+    language: str = "en"
     id: int | None = None
