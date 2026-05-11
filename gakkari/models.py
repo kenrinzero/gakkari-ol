@@ -4,9 +4,18 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
-BILLING_PERIODS = ("monthly", "yearly", "quarterly", "weekly")
+BILLING_PERIODS = ("monthly", "yearly", "quarterly", "weekly", "half_yearly")
 STATUSES = ("active", "paused", "cancelled")
 TAX_MODES = ("none", "inclusive", "exclusive")
+PRICE_DISPLAY_MODES = ("net", "gross")
+
+_MONTHLY_FACTORS: dict[str, Decimal] = {
+    "monthly": Decimal("1"),
+    "yearly": Decimal("1") / 12,
+    "quarterly": Decimal("1") / 3,
+    "weekly": Decimal("52") / 12,
+    "half_yearly": Decimal("1") / 6,
+}
 
 
 @dataclass
@@ -42,6 +51,13 @@ class Subscription:
         if self.tax_mode == "inclusive":
             return self.amount
         return self.amount
+
+    def display_amount(self, mode: str) -> Decimal:
+        return self.net_amount() if mode == "net" else self.gross_amount()
+
+    def monthly_equivalent(self, mode: str) -> Decimal:
+        factor = _MONTHLY_FACTORS.get(self.billing_period, Decimal("1"))
+        return self.display_amount(mode) * factor
 
 
 @dataclass

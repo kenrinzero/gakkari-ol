@@ -113,13 +113,15 @@ def _row_to_sub(row: sqlite3.Row) -> Subscription:
     )
 
 
-def list_subscriptions(conn: sqlite3.Connection, include_inactive: bool = False) -> list[Subscription]:
-    if include_inactive:
-        rows = conn.execute("SELECT * FROM subscriptions ORDER BY next_renewal_date").fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM subscriptions WHERE status = 'active' ORDER BY next_renewal_date"
-        ).fetchall()
+def list_subscriptions(
+    conn: sqlite3.Connection,
+    statuses: tuple[str, ...] = ("active", "paused"),
+) -> list[Subscription]:
+    placeholders = ", ".join("?" for _ in statuses)
+    rows = conn.execute(
+        f"SELECT * FROM subscriptions WHERE status IN ({placeholders}) ORDER BY next_renewal_date",
+        statuses,
+    ).fetchall()
     return [_row_to_sub(r) for r in rows]
 
 
@@ -175,4 +177,31 @@ def save_settings(conn: sqlite3.Connection, s: Settings) -> None:
            WHERE id=1""",
         (s.base_currency, s.price_display_mode, s.due_soon_days,
          int(s.mascot_enabled), int(s.notices_enabled), s.language),
+    )
+
+
+# ── Exchange rate cache ──────────────────────────────────────────────────────
+
+def get_cached_rate(
+    conn: sqlite3.Connection, base: str, quote: str, today: date
+) -> Decimal | None:
+    row = conn.execute(
+        "SELECT rate, fetched_at FROM exchange_rate_cache "
+        "WHERE base_currency=? AND quote_currency=?",
+        (base, quote),
+    ).fetchone()
+    if row is None or row["fetched_at"] != today:
+        return None
+    return row["rate"]
+
+
+def upsert_rate(
+    conn: sqlite3.Connection, base: str, quote: str, rate: Decimal, today: date
+) -> None:
+    conn.execute(
+        "INSERT INTO exchange_rate_cache (base_currency, quote_currency, rate, fetched_at) "
+        "VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(base_currency, quote_currency) DO UPDATE SET "
+        "  rate=excluded.rate, fetched_at=excluded.fetched_at",
+        (base, quote, rate, today),
     )

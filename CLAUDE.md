@@ -33,11 +33,27 @@ gakkari/
   __init__.py
   __main__.py        entry point
   app.py             GakkariApp (Textual App subclass)
-  db.py              SQLite helpers — schema, CRUD, get_conn() context manager
-  models.py          Subscription and Settings dataclasses
+  db.py              SQLite helpers — schema, CRUD, exchange rate cache
+  models.py          Subscription, Settings, _MONTHLY_FACTORS, display helpers
+  strings.py         i18n tables (EN + JA), fmt_* helpers
+  currency.py        get_rate — frankfurter.app fetch + daily SQLite cache
+  io.py              CSV + JSON import/export
+  mascot.py          tiered ASCII art loader (4 sizes, threshold-based pick)
+  notices.py         Phase 3 — pure logic for the 7-day notice board
+  assets/
+    mascot_40.txt    smallest tier (36 visible cols)
+    mascot_50.txt    baseline tier (45 visible cols)
+    mascot_70.txt    large tier (62 visible cols)
+    mascot_90.txt    largest tier (79 visible cols)
   ui/
     __init__.py
-    main_screen.py   MainScreen — table, bindings, due-soon highlight
+    main_screen.py        MainScreen — list + filter + totals + CRUD + notes + notice panel
+    confirm_modal.py      ConfirmModal — yes/no dialog
+    subscription_modal.py SubscriptionModal — add/edit form with validation
+    settings_modal.py     SettingsModal — base currency, gross/net, due-soon
+    export_modal.py       ExportModal — format select + path
+    import_modal.py       ImportModal — path with file-existence check
+    notice_panel.py       NoticePanel — right-column textboard widget
 data/
   gakkari.db         created at first run (gitignored)
 ```
@@ -75,7 +91,7 @@ ExchangeRateCache:
   PRIMARY KEY (base_currency, quote_currency)
 ```
 
-`billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"`.
+`billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
 
 Subscriptions are never hard-deleted for historical accuracy — use `status = "cancelled"` instead. `is_active` from the original spec became a three-way `status` field.
 
@@ -110,23 +126,26 @@ with get_conn() as conn:
 
 | Phase | Goal | Status |
 |---|---|---|
-| 1 | Subscription table, add/edit/delete, persistence, due-soon, keyboard nav | Scaffold only — flows are stubs |
-| 2 | Totals, multi-currency, VAT mode, CSV/JSON import-export, filters | Not started |
-| 3 | 7-day rolling textboard notice panel | Not started |
-| 4 | ASCII mascot, final three-column layout polish | Not started |
+| 1 | Subscription table, add/edit/delete, persistence, due-soon, keyboard nav | **Done** (Session 5) |
+| 2 | Totals, multi-currency, VAT mode, CSV/JSON import-export, filters | **Done** (Session 6) |
+| 3 | 7-day rolling textboard notice panel | **Done** (Session 7) |
+| 4 | ASCII mascot, final three-column layout polish | **Done** (Session 6) |
 | 5 | CLI entrypoint, Windows Task Scheduler integration | Not started |
 
-**Phases 1 and 2 are the finished product.** Everything after is optional polish.
+**Phases 1 and 2 are the finished product.** Everything after is optional polish. Phase 5 is the only remaining work.
 
-### Current state (after Session 4 — aesthetic overhaul)
+### Current state (after Session 7 — textboard notice panel)
 
-- Visual identity locked in: PC-9800/CRT aesthetic — black terminal surround, amber DataTable panel, double-line borders.
-- `gakkari/strings.py` — full i18n module. EN and JA string tables. Helpers: `t()`, `fmt_date()`, `fmt_period()`, `fmt_status()`, `fmt_tax_mode()`, `fmt_category()`. Language toggle (`L` key) persists to `Settings.language` in SQLite.
-- `MainScreen` layout: transposed DataTable (subscriptions as columns, field names as rows), separator columns between subscriptions, detail pane below showing selected subscription's full info, split lower section with summary pane (count + monthly/yearly estimate) and notes pane.
-- DataTable: `cursor_type="column"`, cursor skips separator columns automatically, column headers are subscription names, rows are field values.
-- **`_SAMPLE_SUBS` is still hardcoded** — real DB reads not yet wired in this design.
-- **add/edit/delete are stubs** (show notification only). Modal files from Session 2 (`confirm_modal.py`, `subscription_modal.py`) may exist in the project and can be reused.
-- Next session: replace sample data with real DB reads, wire CRUD modals into the new layout. Goal is a fully functional app by end of that session.
+- Visual identity: PC-9800/CRT aesthetic — amber on black, double-line borders. Unchanged from Session 4.
+- `MainScreen` layout: title bar (mode/paused/totals/rate-fallback warning) → filter bar (`Input`) → `ContentSwitcher` between OptionList and notes view. Left panel renders the mascot; right panel renders the textboard notice stack.
+- Full CRUD: `SubscriptionModal`, `ConfirmModal` (soft-delete). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
+- Phase 2 features wired in: multi-currency totals via `currency.get_rate` (frankfurter, daily SQLite cache, fallback rate also cached so bad codes don't burn HTTP timeouts); gross/net display mode (`g`); paused toggle (`p`); text filter (`/`); settings modal (`s`); CSV/JSON export (`x`) and import (`i`).
+- Mascot: four locked-size art tiers in `gakkari/assets/` (40, 50, 70, 90 chars wide). `gakkari/mascot.py` picks the largest tier whose `min_panel_width` and `min_panel_height` fit; below the smallest tier the panel stays empty. Bottom-aligned, horizontally centered, no_wrap-cropped to prevent line-garble at narrow widths. `m` key toggles `Settings.mascot_enabled`. Re-renders on resize via `call_after_refresh` using `self.app.size` (not `panel.content_size`, which lags).
+- Notice panel (Phase 3): textboard aesthetic — banner + 7 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Always-JA single-char weekday labels regardless of UI language; bodies are EN/JA. **Each post is read from its own date's perspective** — a renewal on the day a post represents always reads as "renews today!", never "tomorrow" or "in N days". Two kaomoji pools (5 each) — renewal-day pool (shock / `ｷﾀ━━━` / flushed / sweat-shock / giko grin) and empty-day pool (smug / shobon / disinterest / orz / friendly). Face and empty-day message both picked deterministically by `post_id` hash, so the same day always renders identically across refreshes. Refreshes on mount, resize, language toggle, and any CRUD action. 60-second `set_interval` tick watches for date rollover so the panel and center list both advance to the new "today" when the app is left open past midnight. A dim `〜 終 〜` thread-end marker closes the stack below post 7. `n` key toggles `Settings.notices_enabled`.
+- Currency-fallback warning: `· ⚠ rate fallback` appears in the title-bar indicators when any active sub's currency lookup returns `Decimal("1")` for a non-base currency (e.g. user typed `YEN` instead of `JPY`). Detected during the existing `_total_monthly_in_base` rate-fetch pass; set is rebuilt each call, so the warning clears as soon as the offending sub is fixed or removed.
+- i18n: full EN+JA bundle covering the Phase 3 surface (banner, body templates, empty-day pool, fallback warning, footer label).
+- `billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
+- Phase 5 (CLI + Task Scheduler) is the only remaining work.
 
 ---
 

@@ -1,0 +1,181 @@
+## Concept
+
+A terminal-first subscription tracker with a restrained retro-anime office aesthetic. Core purpose: keep recurring expenses visible, editable, and easy to review without browser overhead or bloated finance-app complexity.
+
+The app should feel serious, clean, and pleasant to use. The anime office-lady mascot is presentation polish, not the product itself. Gamification is intentionally out. The tool should help the user understand subscriptions and upcoming renewals, not pressure them with fake progress systems.
+
+## Name
+
+Gakkari OL
+
+From がっかり and Office Lady.
+
+## Product direction
+
+**Core value:** clear overview of recurring payments, upcoming renewals, and monthly recurring cost.
+
+**Tone:** calm, serious, readable, slightly stylized.
+
+**Operating principle:** every later feature must strengthen one of three things: clarity, local control, or recurring-use convenience. If a feature exists only to justify style, it should be cut.
+
+## Architecture decisions
+
+**Framework:** Python + Textual. Strong fit for a terminal UI with tables, forms, panels, keyboard navigation, and lightweight visual polish.
+
+**Storage:** SQLite from day one. The JSON-backed prototype option was considered and dropped — the schema is stable enough that going straight to SQLite avoids a later migration step.
+
+**Money handling:** use `Decimal`, not `float`, for all money values and totals.
+
+**Date handling:** treat renewal dates as real dates in logic. Store normalized ISO-style values, but do not build logic around raw strings.
+
+**Currency conversion:** `frankfurter.app` for exchange rates — no API key, ECB-derived, daily. Rates cached per `(base, quote)` pair with a `fetched_at` date. On any fetch failure, fall back to `Decimal("1")` so totals degrade gracefully rather than crash.
+
+**Net-vs-gross with multi-currency:** convert first, then apply tax. Avoids compounding rounding error across two transformations.
+
+**Internationalization:** EN/JA toggle from a single `strings.py` module. Language persists to Settings. Adding more languages is a string-table addition, not a code change.
+
+**Automation boundary:** renewal calculation and weekly notice generation belong inside the app. Windows Task Scheduler is only an outer trigger layer for later automation.
+
+**Scope discipline:** no accounts, cloud sync, mobile companion, or web rewrite. Local tool first.
+
+## Data model
+
+### Subscription
+
+`Subscription { id, name, amount, currency, billing_period, next_renewal_date, category, notes, tax_mode, tax_rate, status }`
+
+`status` is a three-way `"active"` | `"paused"` | `"cancelled"` field. Pausing is common enough to deserve its own state, and the cost is one extra column plus a status indicator in the list. Subscriptions are never hard-deleted — delete sets `status = "cancelled"` so historical data remains intact.
+
+`billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"`.
+
+### Settings
+
+`Settings { base_currency, price_display_mode, due_soon_days, mascot_enabled, notices_enabled, language }`
+
+### Exchange rate cache
+
+`ExchangeRateCache { base_currency, quote_currency, rate, fetched_at }`
+
+### Notes on fields
+
+- `tax_mode` (`none` / `inclusive` / `exclusive`) and `tax_rate` let each row derive either net or gross display depending on the global setting.
+- `status` replaces the original `is_active` flag. Active and paused subscriptions appear in the list; cancelled subscriptions are filtered out by default.
+
+## UI structure
+
+The layout is three-column, mascot always visible:
+
+- **Left:** static ASCII mascot
+- **Center:** subscription list and aggregate totals — the functional and visual center of the app
+- **Right:** weekly textboard notice panel (rolling 7-day window)
+
+The mascot and notice board support the center column rather than compete with it.
+
+### Center column behavior
+
+The center column is narrow (~33% of terminal width), which rules out a flat row-based table — at any reasonable subscription count, fitting Name | Amount | Currency | Period | Date | Category | Status across that width forces ugly truncation or sideways scrolling. The column instead holds a vertical list of multi-line entries: each subscription is a short stacked block showing name, amount, period, next renewal, due-soon marker, category, and status. Aggregate totals (count, monthly, yearly) live in a header strip above the list.
+
+Notes are reached by master-detail drill-in: right-arrow on a selected entry opens a full-column notes editor for that subscription; left-arrow returns to the list. A subtle indicator on each list entry shows whether notes exist, so the drill-in isn't blind exploration.
+
+## Phase breakdown
+
+## Phase 1 — subscription tracker that is genuinely pleasant to use
+
+**Goal:** a local TUI app that already feels like a finished small product.
+
+**Deliverables:**
+
+- subscription list with strong readability
+- add, edit, and delete flows
+- local persistence
+- due-soon highlighting
+- keyboard-first navigation
+- basic categories and notes (with master-detail drill-in for notes editing)
+
+**Success condition:** the app is already useful before any advanced features exist.
+
+## Phase 2 — totals, currencies, VAT mode, import/export, filters
+
+**Goal:** make the tracker practically robust.
+
+**Deliverables:**
+
+- monthly and yearly recurring totals
+- base-currency conversion with cached exchange rates
+- display setting for net or gross prices
+- per-row tax logic rendered according to chosen display mode
+- filtering and search
+- CSV and JSON export/import
+
+**Implementation note:** totals should always respect the current display mode and selected base currency.
+
+## Phase 3 — textboard weekly notice panel
+
+**Goal:** add temporal rhythm without turning the app into a gimmick.
+
+The notice panel represents a rolling seven-day window. The shift does not need flashy visible animation. Instead, the app quietly advances the board by one day whenever the date changes: oldest day drops off, remaining days conceptually move down, new day appears at the top of the next cycle.
+
+**Notice format example:**
+
+```
+╔════════════════════════════════════════╗
+║ [Mon] Netflix renews in 3 days!       ║
+║  （´・ω・）                            ║
+╠════════════════════════════════════════╣
+║ [Tue] No renewals today!              ║
+║  （´・ω・）                            ║
+╚════════════════════════════════════════╝
+```
+
+**Deliverables:**
+
+- 7-day rolling logic
+- short renewal notices
+- calm default messages on empty days
+- 2 to 3 simple ASCII face variants at most
+
+## Phase 4 — mascot and presentation polish
+
+**Goal:** add identity without undermining seriousness.
+
+The mascot is a static, simple ASCII rendering of a serious-looking anime office lady. Concerned, competent, and restrained is the right tone. She is not a reward system, not a mood engine, and not the center of the interface.
+
+**Deliverables:**
+
+- one main mascot pose
+- optional alternate expression variants only if they remain subtle
+- visual cleanup of spacing, borders, typography, and color accents
+- final alignment of mascot, list, and notice board into one coherent layout
+
+## Phase 5 — optional automation and scheduler integration
+
+**Goal:** allow the app to participate in daily routines without making automation part of the core architecture.
+
+**Deliverables:**
+
+- CLI entrypoint or script for daily notice output
+- Windows Task Scheduler integration for scheduled runs
+- optional generation of a daily summary view or exported text snippet
+
+**Important constraint:** scheduler support should call app logic, not replace it.
+
+## Renewal and notice logic
+
+- A subscription is considered "due soon" when its renewal date falls within the configured threshold window.
+- Weekly notices are generated from the current date forward, not hardcoded to calendar weeks.
+- Empty days still render a short calm message so the board never looks broken.
+- Renewal logic is deterministic and inspectable.
+
+## VAT and totals logic
+
+The model is a global display preference: show net prices, or show gross prices.
+
+Each subscription row stores enough tax information to derive the requested display value. Aggregates sum in whichever mode the user selected. This keeps the app coherent and avoids per-screen toggle confusion.
+
+## Roadmap summary
+
+- **Core finished product:** phases 1 and 2
+- **Personality layer:** phases 3 and 4
+- **Outer convenience layer:** phase 5
+
+This ordering matters. The project is successful if phases 1 and 2 land cleanly. Everything after that should remain optional polish, not structural dependency.

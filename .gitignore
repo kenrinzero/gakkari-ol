@@ -19,3 +19,9 @@ build/
 .vscode/
 .idea/
 *.swp
+
+# Claude Code internal: worktrees, settings, agent state
+.claude/
+
+# Mascot art source/mockup workspace — bundled tiers live in gakkari/assets/
+mascot/
