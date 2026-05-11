@@ -31,8 +31,9 @@ TEXTUAL_LOG=1 python -m gakkari
 ```
 gakkari/
   __init__.py
-  __main__.py        entry point
+  __main__.py        entry point — argparse for --notice / --lang, default launches TUI
   app.py             GakkariApp (Textual App subclass)
+  cli.py             Phase 5 — render today's renewals + 7-day preview for stdout
   db.py              SQLite helpers — schema, CRUD, exchange rate cache
   models.py          Subscription, Settings, _MONTHLY_FACTORS, display helpers
   strings.py         i18n tables (EN + JA), fmt_* helpers
@@ -130,11 +131,11 @@ with get_conn() as conn:
 | 2 | Totals, multi-currency, VAT mode, CSV/JSON import-export, filters | **Done** (Session 6) |
 | 3 | 7-day rolling textboard notice panel | **Done** (Session 7) |
 | 4 | ASCII mascot, final three-column layout polish | **Done** (Session 6) |
-| 5 | CLI entrypoint, Windows Task Scheduler integration | Not started |
+| 5 | CLI entrypoint, Windows Task Scheduler integration | **Done** (Session 8) |
 
-**Phases 1 and 2 are the finished product.** Everything after is optional polish. Phase 5 is the only remaining work.
+**Phases 1 and 2 are the finished product.** Phases 3, 4, 5 are all complete. The project is feature-complete per the original spec.
 
-### Current state (after Session 7 — textboard notice panel)
+### Current state (after Session 8 — CLI + Task Scheduler)
 
 - Visual identity: PC-9800/CRT aesthetic — amber on black, double-line borders. Unchanged from Session 4.
 - `MainScreen` layout: title bar (mode/paused/totals/rate-fallback warning) → filter bar (`Input`) → `ContentSwitcher` between OptionList and notes view. Left panel renders the mascot; right panel renders the textboard notice stack.
@@ -145,7 +146,7 @@ with get_conn() as conn:
 - Currency-fallback warning: `· ⚠ rate fallback` appears in the title-bar indicators when any active sub's currency lookup returns `Decimal("1")` for a non-base currency (e.g. user typed `YEN` instead of `JPY`). Detected during the existing `_total_monthly_in_base` rate-fetch pass; set is rebuilt each call, so the warning clears as soon as the offending sub is fixed or removed.
 - i18n: full EN+JA bundle covering the Phase 3 surface (banner, body templates, empty-day pool, fallback warning, footer label).
 - `billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
-- Phase 5 (CLI + Task Scheduler) is the only remaining work.
+- CLI (Phase 5): `python -m gakkari --notice` reads the DB and prints today's renewals + a 7-day preview to stdout, then exits. Designed to be called from Windows Task Scheduler on login. `--lang en|ja` overrides the saved UI language. `sys.stdout.reconfigure(encoding="utf-8")` keeps the JA banner and kaomoji from crashing the legacy Console Host. Task Scheduler recipe lives in `gakkari_docs/scheduler.md`.
 
 ---
 
