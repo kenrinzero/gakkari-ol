@@ -1,9 +1,27 @@
 [project]
 name = "gakkari-ol"
 version = "0.1.0"
+description = "Calm, local-only terminal subscription tracker — Python + Textual + SQLite."
+readme = "README.md"
+license = "MIT"
 requires-python = ">=3.12"
+authors = [{ name = "kenrinzero" }]
+keywords = ["subscription", "tracker", "tui", "textual", "terminal", "sqlite"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Utilities",
+]
 dependencies = [
     "textual>=1.0.0",
+    "rich>=13.0.0",
     "httpx>=0.27.0",
 ]
 
@@ -13,9 +31,17 @@ dev = ["textual-dev"]
 [project.scripts]
 gakkari = "gakkari.__main__:main"
 
+[project.urls]
+Homepage = "https://github.com/kenrinzero/gakkari-ol"
+Source = "https://github.com/kenrinzero/gakkari-ol"
+Issues = "https://github.com/kenrinzero/gakkari-ol/issues"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gakkari*"]
+
+[tool.setuptools.package-data]
+gakkari = ["assets/*.txt"]
 
 [build-system]
 requires = ["setuptools>=70"]

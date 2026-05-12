@@ -34,12 +34,18 @@ def _trim(text: str) -> str:
 def _read(name: str) -> str:
     if name not in _CACHE:
         path = _ASSETS / f"mascot_{name}.txt"
-        _CACHE[name] = _trim(path.read_text(encoding="utf-8"))
+        try:
+            _CACHE[name] = _trim(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError):
+            # Mascot is decoration — a missing/unreadable asset must not crash
+            # the app. Cache an empty string so we don't retry the dead path.
+            _CACHE[name] = ""
     return _CACHE[name]
 
 
 def load_mascot(inner_width: int, inner_height: int) -> str | None:
     for name, min_w, min_h in _TIERS:
         if inner_width >= min_w and inner_height >= min_h:
-            return _read(name)
+            art = _read(name)
+            return art if art else None
     return None
