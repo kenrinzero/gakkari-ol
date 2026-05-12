@@ -9,8 +9,11 @@ Terminal subscription tracker. Python + Textual TUI, SQLite storage, local-only.
 ## Running the app
 
 ```powershell
-cd C:\Users\kenrin\Project\Gakkari_OL
+cd path\to\gakkari-ol
+# Windows PowerShell:
 .venv\Scripts\Activate.ps1
+# Unix shells:
+source .venv/bin/activate
 python -m gakkari
 ```
 
