@@ -73,7 +73,7 @@ Full architectural notes are in [CLAUDE.md](CLAUDE.md).
 Built collaboratively with several AI models. Each contributed a distinct stage of the work:
 
 - **Mistral Large 2** — original concept
-- **Grok 4.3** — mascot character design
+- **Grok Imagine** — mascot character design
 - **Claude Sonnet 4.7** — initial scaffold and visual style
 - **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board, mascot)
 - **Claude Opus 4.7** — CLI entry point and release prep (Phase 5)
