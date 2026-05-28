@@ -63,7 +63,11 @@ gakkari/
 data/
   gakkari.db         created at first run (gitignored)
 docs/
-  scheduler.md       Windows Task Scheduler recipe for --notice
+  index.html              landing page (live at kenrinzero.github.io/gakkari-ol/)
+  scheduler.md            Windows Task Scheduler recipe for --notice
+  Glass_TTY_VT220.ttf     bundled font (DEC VT220 bitmap, Latin/symbols)
+  DotGothic16-subset.woff2  bundled font (16×16 pixel Japanese, subset to the codepoints used on the page)
+  .nojekyll               disables GitHub's Jekyll so files serve as-is
 ```
 
 ---
