@@ -9,12 +9,19 @@
 <meta property="og:description" content="A calm, local-only terminal subscription tracker.">
 <meta property="og:type" content="website">
 <style>
-/* Bitmap-style font from a DEC VT220 (1985). Bundled in the same folder.
- * Falls back to system monospace for Japanese glyphs the VT220 doesn't have. */
+/* Glass TTY VT220 — DEC VT220 (1985) bitmap font for Latin.
+ * DotGothic16 — 16×16 pixel-style Japanese, subset to just the
+ * codepoints used on this page (~32KB instead of ~2MB). */
 @font-face {
   font-family: 'Glass TTY VT220';
   src: url('Glass_TTY_VT220.ttf') format('truetype');
   font-display: swap;
+}
+@font-face {
+  font-family: 'DotGothic16';
+  src: url('DotGothic16-subset.woff2') format('woff2');
+  font-display: swap;
+  unicode-range: U+3000-303F, U+3040-309F, U+30A0-30FF, U+FF61-FF9F, U+4E00-9FFF;
 }
 :root {
   --bg: #000000;
@@ -35,7 +42,7 @@ html { background: var(--bg); scroll-behavior: smooth; }
 body {
   background: radial-gradient(ellipse at center, #0a0500 0%, #000000 80%);
   color: var(--amber);
-  font-family: 'Glass TTY VT220', 'Consolas', 'Courier New', monospace;
+  font-family: 'Glass TTY VT220', 'DotGothic16', 'Consolas', 'Courier New', monospace;
   font-size: 20px; line-height: 1.5; min-height: 100vh;
   padding: 2rem 1rem 4rem; text-shadow: var(--glow-soft);
   -webkit-font-smoothing: antialiased;
