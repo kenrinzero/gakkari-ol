@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gakkari OL — terminal subscription tracker</title>
+<meta name="description" content="A calm, local-only terminal subscription tracker. Python + Textual TUI, SQLite storage. No accounts, no cloud, no telemetry.">
+<meta property="og:title" content="Gakkari OL">
+<meta property="og:description" content="A calm, local-only terminal subscription tracker.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="flicker" aria-hidden="true"></div>
+
+<header class="boot">
+  <span class="prompt">C:\GAKKARI&gt;</span>
+  ver 1.0 · 2026 · ready<span class="cursor">▮</span>
+</header>
+
+<main>
+
+<section class="hero">
+  <pre class="mascot" aria-hidden="true">                     %##% %
+                 *+;:,..,,,,:;+*%
+              %+,      .  .     .;*
+             +:.................   :*
+           %;,::,,............. ...,,+
+           ;...,.,,,.,,,,.,.,..:,.,,..=
+          + .... ..... .. .;...=,.. . ;
+          , .......    :,:=:::+#;;....=
+         *.........:;::;;++=*=+;:::  :
+         - ........;,:.::--=*=. -::. ,%
+        %, ........;-:,***;;-;;;=-:. .*
+        *........ :+====*=+=*=+=+=, . +
+        = . ..... :*=====****==**-   .:
+        *........ ,+*#*****=++**+    .,%
+         ;.    ....:-+=**#**=*=:      :
+         %*-:,.    ,=+;;;-+==-.     .;*
+              %#*+,:+**+;,.:++**#=-*#
+             %#*=-;******=-,;+=#
+        *==++--;-+-+*******-+--+==*#%
+      *----++==--==--=====**==+-++--+=+*
+     *;+==++===+-===+-=********=-+=+++-:=
+     --====++=+=-+===++=*********--+=-;;-%
+    %-+===+=+-==--=====++=********=---;;-*
+    %-+====++--++-++++===++=*#*=**#=-=++-;#
+    %-+=++==++;;++++--;------=*=+=**--==+;+%
+     --+++====+;-+===+-===+++-+*=;+=*-==----
+     #---+=====+;-+==+++======+=###%#-+-;-;;=%
+      #--+=+---+--;-+==+++===++--***+;-;+==*=--%
+       +;+=-;;--+++---+++---------+++++=******;=
+       =-==-;;;+-;;---;------++++=+===+;+**===+-%
+       =;+=++;-;;-+++++=============+---:--;;-:;#
+        *-+=+++-+================++-++++;-++--;*
+         %=--=++=============++-----+---;-++---
+           *--++=====++++--;;;;;------;------+#
+            %=------------;:;----;--;+===*##%
+              #;-----------------;;-;*
+             %--+====+++++++++-;;:;---*
+            %--+=============+--+-;----#</pre>
+
+  <div class="title-block">
+    <h1>がっかり OL</h1>
+    <p class="kana">gakkari OL</p>
+    <p class="tag">the small sigh you make when you check your monthly subscriptions.</p>
+    <p class="meta">Python · Textual TUI · SQLite · local-only · no cloud · no telemetry</p>
+    <p class="cta">
+      <a class="btn" href="#install">→ install</a>
+      <a class="btn ghost" href="https://github.com/kenrinzero/gakkari-ol">github</a>
+    </p>
+  </div>
+</section>
+
+<section class="panel" id="about">
+  <h2>about</h2>
+  <p>
+    <em>がっかり</em> (gakkari) — “disappointed / let down.”
+    <em>OL</em> — Office Lady. The small sigh of opening your bank app and seeing the monthly total.
+  </p>
+  <p>
+    Gakkari OL is a calm terminal subscription tracker. It runs locally, stores everything in a single SQLite file next to the code, and reminds you what renews this week in the visual idiom of a Japanese textboard.
+  </p>
+  <p>
+    No accounts. No cloud sync. No telemetry. No gamification.
+  </p>
+</section>
+
+<section class="panel" id="install">
+  <h2>install</h2>
+  <p>Requires Python 3.12 or newer.</p>
+  <div class="install-box">
+    <code class="cmd" id="install-cmd">pip install git+https://github.com/kenrinzero/gakkari-ol</code>
+    <button class="copy" data-target="install-cmd">copy</button>
+  </div>
+  <p>Then launch:</p>
+  <pre class="cmd-run">$ python -m gakkari</pre>
+  <p class="hint">Once installed, the <code>gakkari</code> console script also works (<code>.venv\Scripts\gakkari.exe</code> on Windows).</p>
+</section>
+
+<section class="panel" id="features">
+  <h2>features</h2>
+  <ul class="features">
+    <li><b>CRUD with soft-delete</b> — subs are never hard-deleted; cancelled is the terminal state.</li>
+    <li><b>Multi-currency totals</b> — ECB rates from <a href="https://www.frankfurter.app/">frankfurter.app</a>, cached daily.</li>
+    <li><b>Gross / net VAT modes</b>, per-row tax mode + rate.</li>
+    <li><b>Adaptive notice board</b> — 1 to 2 week rolling textboard window. Trial-expiry warnings with louder kaomoji.</li>
+    <li><b>Auto-advance (<kbd>k</kbd>)</b> — one keystroke advances a renewal and logs it to a local ledger.</li>
+    <li><b>History view (<kbd>h</kbd>)</b> — chronological renewal log with running total in your base currency.</li>
+    <li><b>Archive view (<kbd>v</kbd>)</b> — surface cancelled subs dimmed for reference.</li>
+    <li><b>Conversion column (<kbd>c</kbd>)</b> — show each row in your base currency next to its native price.</li>
+    <li><b>Sort &amp; totals cycles</b> — date / period / name / amount; estimate / monthly-strict / yearly-strict / by-period.</li>
+    <li><b>ASCII mascot screen (<kbd>m</kbd>)</b> — four tier sizes, scales to your terminal.</li>
+    <li><b>CSV &amp; JSON import / export</b>, full EN / JA bilingual UI.</li>
+    <li><b>Daily <code>--notice</code> CLI</b> for Windows Task Scheduler, cron, login scripts.</li>
+  </ul>
+</section>
+
+<section class="panel" id="preview">
+  <h2>preview</h2>
+  <p>This is the notice panel for an active install — adaptive textboard with renewal posts, trial warnings, deterministic kaomoji per day.</p>
+  <pre class="textboard">────────────────────────────────────────
+            Upcoming renewals
+────────────────────────────────────────
+
+1 ：OL ：2026-05-28(木) ID:66e347b3
+Spotify renews today!
++ 1 more
+ｷﾀ━━━(ﾟ∀ﾟ)━━━!!
+────────────────────────────────────────
+
+2 ：OL ：2026-05-29(金) ID:e0130a8d
+No renewals today
+( ´∀｀)
+────────────────────────────────────────
+
+3 ：OL ：2026-05-30(土) ID:22174871
+Pixiv Premium renews today!
+Σ(ﾟДﾟ)
+────────────────────────────────────────
+
+4 ：OL ：2026-06-02(火) ID:dea2b7ff
+NewApp Beta trial ends today!
+(((;ﾟДﾟ)))
+────────────────────────────────────────
+
+           〜 終 〜
+</pre>
+</section>
+
+<section class="panel" id="keys">
+  <h2>keybindings</h2>
+  <div class="key-grid">
+    <div class="key-group">
+      <h3>Editing</h3>
+      <dl class="kbd">
+        <dt><kbd>a</kbd></dt><dd>Add</dd>
+        <dt><kbd>e</kbd></dt><dd>Edit</dd>
+        <dt><kbd>d</kbd></dt><dd>Delete (cancel)</dd>
+        <dt><kbd>k</kbd></dt><dd>Kept it · advance &amp; log</dd>
+        <dt><kbd>→</kbd></dt><dd>Notes</dd>
+      </dl>
+    </div>
+    <div class="key-group">
+      <h3>Views</h3>
+      <dl class="kbd">
+        <dt><kbd>/</kbd></dt><dd>Filter</dd>
+        <dt><kbd>g</kbd></dt><dd>Gross / Net</dd>
+        <dt><kbd>p</kbd></dt><dd>Paused</dd>
+        <dt><kbd>v</kbd></dt><dd>Archive</dd>
+        <dt><kbd>o</kbd></dt><dd>Sort cycle</dd>
+        <dt><kbd>t</kbd></dt><dd>Totals cycle</dd>
+        <dt><kbd>c</kbd></dt><dd>Convert column</dd>
+      </dl>
+    </div>
+    <div class="key-group">
+      <h3>Screens</h3>
+      <dl class="kbd">
+        <dt><kbd>m</kbd></dt><dd>Mascot</dd>
+        <dt><kbd>h</kbd></dt><dd>History</dd>
+        <dt><kbd>n</kbd></dt><dd>Notices ↔ Tutorial</dd>
+      </dl>
+    </div>
+    <div class="key-group">
+      <h3>App</h3>
+      <dl class="kbd">
+        <dt><kbd>s</kbd></dt><dd>Settings</dd>
+        <dt><kbd>x</kbd></dt><dd>Export</dd>
+        <dt><kbd>i</kbd></dt><dd>Import</dd>
+        <dt><kbd>l</kbd></dt><dd>Language</dd>
+        <dt><kbd>q</kbd></dt><dd>Quit</dd>
+        <dt><kbd>?</kbd></dt><dd>Help</dd>
+      </dl>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="cli">
+  <h2>daily notice</h2>
+  <p>
+    <code>python -m gakkari --notice</code> reads the database and prints today’s renewals plus a 7-day preview, then exits. Wire it into Windows Task Scheduler (or cron, or login scripts) and you’ll see what renews this week before you open anything else.
+  </p>
+  <pre class="cmd-run">[Gakkari OL] Upcoming renewals — 2026-05-12 (火)
+───────────────────────────────────────────────
+
+!! TODAY (1):
+  - Spotify  USD 9.99  (monthly)
+
+Upcoming (next 7 days):
+  +2d 2026-05-14 (木)  Netflix  USD 15.49
+  +5d 2026-05-17 (日)  Domain   USD 12.00</pre>
+  <p><a href="https://github.com/kenrinzero/gakkari-ol/blob/main/docs/scheduler.md">Windows Task Scheduler recipe →</a></p>
+</section>
+
+<section class="panel" id="credits">
+  <h2>credits</h2>
+  <p>Built collaboratively with several AI models, each contributing a distinct stage:</p>
+  <ul class="credits">
+    <li><b>Mistral Large 2</b> — original concept</li>
+    <li><b>Grok Imagine</b> — mascot character design</li>
+    <li><b>Claude Sonnet 4.7</b> — initial scaffold and visual style</li>
+    <li><b>Claude Opus 4.6</b> — feature implementation (Phases 1–4)</li>
+    <li><b>Claude Opus 4.7</b> — Phases 5–6: CLI, restructure, mascot &amp; history screens, ledger, archive, trial expiry, sort/totals/convert cycles, adaptive notice window, tutorial alt-state</li>
+  </ul>
+  <p>MIT licensed. Source on <a href="https://github.com/kenrinzero/gakkari-ol">GitHub</a>.</p>
+</section>
+
+</main>
+
+<footer>
+  <p>〜 終 〜</p>
+  <p class="dim">no telemetry · no analytics · this page sets no cookies</p>
+</footer>
+
+<script>
+  document.querySelectorAll('.copy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      navigator.clipboard.writeText(target.textContent.trim()).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'copied';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = orig;
+          btn.classList.remove('copied');
+        }, 1500);
+      }).catch(() => {
+        btn.textContent = 'err';
+        setTimeout(() => btn.textContent = 'copy', 1500);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>

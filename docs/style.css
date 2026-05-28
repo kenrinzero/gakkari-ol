@@ -1,0 +1,505 @@
+/* Gakkari OL — landing page
+ * Retro amber-on-black terminal aesthetic with CRT scanlines + phosphor glow.
+ */
+
+:root {
+  --bg: #000000;
+  --bg-soft: #0d0800;
+  --bg-softer: #1a0d00;
+  --amber: #ffb000;
+  --amber-bright: #ff8c00;
+  --amber-dim: #cc8800;
+  --amber-dimmer: #664400;
+  --amber-faint: #2a1500;
+  --red: #ff4444;
+  --glow: 0 0 6px rgba(255, 140, 0, 0.55);
+  --glow-soft: 0 0 3px rgba(255, 140, 0, 0.4);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+html {
+  background: var(--bg);
+  scroll-behavior: smooth;
+}
+
+body {
+  background: radial-gradient(ellipse at center, #0a0500 0%, #000000 80%);
+  color: var(--amber);
+  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+  font-size: 16px;
+  line-height: 1.6;
+  min-height: 100vh;
+  padding: 2rem 1rem 4rem;
+  text-shadow: var(--glow-soft);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── CRT effects ───────────────────────────────────────────── */
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0) 4px
+  );
+}
+
+.flicker {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  background: rgba(255, 176, 0, 0.015);
+  animation: flicker 6s infinite;
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 0.9; }
+  50%      { opacity: 1; }
+  52%      { opacity: 0.85; }
+  54%      { opacity: 1; }
+}
+
+/* ── Boot header ───────────────────────────────────────────── */
+
+.boot {
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--amber-dim);
+  margin-bottom: 2.5rem;
+  letter-spacing: 0.05em;
+}
+
+.boot .prompt {
+  color: var(--amber);
+  margin-right: 0.75em;
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.6em;
+  color: var(--amber-bright);
+  animation: blink 1s steps(1) infinite;
+  margin-left: 0.25em;
+  text-shadow: var(--glow);
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ── Layout ────────────────────────────────────────────────── */
+
+main {
+  max-width: 84ch;
+  margin: 0 auto;
+}
+
+/* ── Hero ──────────────────────────────────────────────────── */
+
+.hero {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2rem;
+  align-items: center;
+  padding: 1.5rem 0 3rem;
+  margin-bottom: 1.5rem;
+}
+
+.mascot {
+  font-family: inherit;
+  font-size: 0.45em;
+  line-height: 1.0;
+  color: var(--amber-dim);
+  white-space: pre;
+  text-shadow: var(--glow);
+  margin: 0;
+  user-select: none;
+}
+
+.title-block h1 {
+  font-size: 3.2rem;
+  font-weight: 700;
+  color: var(--amber-bright);
+  margin: 0;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 12px rgba(255, 140, 0, 0.65), 0 0 24px rgba(255, 140, 0, 0.25);
+}
+
+.title-block .kana {
+  color: var(--amber-dim);
+  font-size: 0.95em;
+  margin: 0.2rem 0 1rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.title-block .tag {
+  color: var(--amber);
+  font-size: 1.1em;
+  margin: 0 0 0.75rem;
+  line-height: 1.4;
+}
+
+.title-block .meta {
+  color: var(--amber-dim);
+  font-size: 0.85em;
+  margin: 0 0 1.5rem;
+  line-height: 1.5;
+}
+
+.title-block .cta {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ───────────────────────────────────────────────── */
+
+.btn {
+  display: inline-block;
+  background: var(--amber-dim);
+  color: var(--bg);
+  text-decoration: none;
+  padding: 0.5rem 1.25rem;
+  border: 2px solid var(--amber-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.9em;
+  text-shadow: none;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.btn:hover,
+.btn:focus {
+  background: var(--amber-bright);
+  border-color: var(--amber-bright);
+  box-shadow: 0 0 18px rgba(255, 140, 0, 0.55);
+  outline: none;
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--amber-bright);
+  text-shadow: var(--glow-soft);
+}
+
+.btn.ghost:hover,
+.btn.ghost:focus {
+  background: var(--amber-bright);
+  color: var(--bg);
+  text-shadow: none;
+}
+
+/* ── Panels (sections styled as TUI windows) ───────────────── */
+
+.panel {
+  border: 4px double var(--amber-dim);
+  padding: 2rem 1.5rem 1.5rem;
+  margin: 0 0 2.5rem;
+  position: relative;
+  background: rgba(13, 8, 0, 0.4);
+}
+
+.panel h2 {
+  position: absolute;
+  top: -0.85rem;
+  left: 1.25rem;
+  background: var(--amber-dim);
+  color: var(--bg);
+  padding: 0.15rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin: 0;
+  text-shadow: none;
+}
+
+.panel p {
+  margin: 0 0 1rem;
+}
+
+.panel p:last-child { margin-bottom: 0; }
+
+.panel em {
+  color: var(--amber-bright);
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* ── Install code box ──────────────────────────────────────── */
+
+.install-box {
+  display: flex;
+  margin: 1rem 0;
+  border: 1px solid var(--amber-dim);
+  background: var(--bg-soft);
+}
+
+.cmd {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 0.95em;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: transparent;
+  text-shadow: var(--glow-soft);
+}
+
+.copy {
+  background: var(--amber-dim);
+  color: var(--bg);
+  border: none;
+  border-left: 1px solid var(--amber-dim);
+  padding: 0 1.25rem;
+  font-family: inherit;
+  font-size: 0.85em;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  transition: background-color 0.15s;
+}
+
+.copy:hover { background: var(--amber-bright); }
+.copy.copied { background: var(--amber-bright); }
+
+.cmd-run {
+  background: var(--bg-soft);
+  padding: 0.85rem 1rem;
+  border-left: 3px solid var(--amber-dim);
+  margin: 1rem 0;
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 0.95em;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  text-shadow: var(--glow-soft);
+}
+
+.hint {
+  color: var(--amber-dim);
+  font-size: 0.9em;
+}
+
+.hint code,
+.panel p code {
+  background: var(--bg-soft);
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--amber-faint);
+  color: var(--amber);
+  font-size: 0.95em;
+}
+
+/* ── Feature list ──────────────────────────────────────────── */
+
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.features li {
+  padding-left: 1.5em;
+  position: relative;
+  line-height: 1.5;
+}
+
+.features li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--amber-bright);
+  text-shadow: var(--glow);
+}
+
+.features b {
+  color: var(--amber-bright);
+  font-weight: 700;
+}
+
+/* ── Textboard preview ─────────────────────────────────────── */
+
+.textboard {
+  background: var(--bg-soft);
+  padding: 1.25rem;
+  border: 1px solid var(--amber-faint);
+  color: var(--amber);
+  font-family: inherit;
+  font-size: 0.85em;
+  line-height: 1.5;
+  overflow-x: auto;
+  margin: 1rem 0 0;
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Keybindings ───────────────────────────────────────────── */
+
+.key-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18ch, 1fr));
+  gap: 1.5rem 2rem;
+}
+
+.key-group h3 {
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--amber-bright);
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--amber-faint);
+}
+
+dl.kbd {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 2.5em 1fr;
+  row-gap: 0.35rem;
+  column-gap: 0.5rem;
+  align-items: baseline;
+}
+
+dl.kbd dt {
+  margin: 0;
+}
+
+dl.kbd dd {
+  margin: 0;
+  color: var(--amber-dim);
+  font-size: 0.95em;
+}
+
+kbd {
+  display: inline-block;
+  background: var(--bg-soft);
+  border: 1px solid var(--amber-dim);
+  color: var(--amber-bright);
+  padding: 0.05em 0.45em;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-weight: 700;
+  min-width: 1.4em;
+  text-align: center;
+  text-shadow: var(--glow-soft);
+}
+
+/* ── Credits ───────────────────────────────────────────────── */
+
+.credits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.credits li {
+  padding-left: 1.5em;
+  position: relative;
+  line-height: 1.5;
+}
+
+.credits li::before {
+  content: '·';
+  position: absolute;
+  left: 0.4em;
+  color: var(--amber-bright);
+}
+
+.credits b {
+  color: var(--amber-bright);
+  font-weight: 700;
+}
+
+/* ── Links ─────────────────────────────────────────────────── */
+
+a {
+  color: var(--amber-bright);
+  text-decoration: underline;
+  text-decoration-color: var(--amber-dim);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  transition: background-color 0.1s, color 0.1s;
+}
+
+a:hover,
+a:focus {
+  background: var(--amber-bright);
+  color: var(--bg);
+  text-shadow: none;
+  outline: none;
+}
+
+/* ── Footer ────────────────────────────────────────────────── */
+
+footer {
+  max-width: 84ch;
+  margin: 4rem auto 0;
+  text-align: center;
+  color: var(--amber-dimmer);
+  font-size: 0.85em;
+  letter-spacing: 0.15em;
+}
+
+footer p { margin: 0.5rem 0; }
+footer .dim { color: var(--amber-faint); font-size: 0.85em; letter-spacing: 0.1em; }
+
+/* ── Responsive ────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  body { padding: 1.5rem 0.75rem 3rem; font-size: 15px; }
+
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    text-align: center;
+    padding: 1rem 0 2rem;
+  }
+
+  .mascot { font-size: 0.4em; margin: 0 auto; }
+
+  .title-block h1 { font-size: 2.4rem; }
+  .title-block .cta { justify-content: center; }
+
+  .panel { padding: 1.75rem 1rem 1.25rem; }
+  .panel h2 { font-size: 0.78rem; left: 1rem; }
+
+  .install-box { flex-direction: column; }
+  .install-box .copy {
+    border-left: none;
+    border-top: 1px solid var(--amber-dim);
+    padding: 0.55rem;
+  }
+
+  .key-grid { gap: 1.25rem; }
+}
+
+@media (max-width: 480px) {
+  .mascot { font-size: 0.35em; }
+  .title-block h1 { font-size: 2rem; }
+}
+
+/* ── Reduce motion respect ─────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .cursor,
+  .flicker { animation: none; }
+}
