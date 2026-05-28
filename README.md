@@ -48,12 +48,18 @@ The SQLite database is created on first launch at `data/gakkari.db` inside the p
 ## Features
 
 - Subscription CRUD with soft-delete (`status` = active / paused / cancelled), keyboard-only navigation, notes drill-in.
-- Multi-currency totals — exchange rates fetched daily from [frankfurter.app](https://www.frankfurter.app/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.
-- Gross / net VAT display mode, per-row tax mode and rate.
-- CSV and JSON import / export.
-- 7-day rolling notice board styled after a Japanese textboard — deterministic kaomoji per day, full EN/JA bilingual.
-- Optional ASCII mascot panel with four locked tiers that pick the largest fit for your terminal size. Toggleable, decoration only.
-- One-shot `--notice` CLI for daily routines (Windows Task Scheduler, cron, login scripts).
+- **Auto-advance (`k`)** — one keystroke advances a sub's renewal date by one billing cycle (with month-end + leap-year clamping) and logs the renewal to a local ledger.
+- **History view (`h`)** — chronological renewal log with running total summed into your base currency.
+- **Archive view (`v`)** — surface cancelled subs dimmed for reference without un-deleting them.
+- **Adaptive notice board** — Japanese textboard styling with a rolling 1-to-2-week window that expands as your terminal gets taller. Deterministic kaomoji per day, EN/JA bilingual. Press `n` to flip between notices and a categorized keybindings tutorial.
+- **Trial expiry warnings** — optional `trial_ends` per sub; the notice board surfaces an alarmed-kaomoji post on the day a trial converts to paid.
+- **Multi-currency totals** — exchange rates fetched daily from [frankfurter.app](https://www.frankfurter.app/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.
+- **Sort (`o`) and totals (`t`) cycles** — sort by date / period / name / amount; totals as monthly+yearly estimate, strict-monthly, strict-yearly, or per-period breakdown.
+- **Conversion column (`c`)** — show each row's amount in your base currency next to its native price, so you stop doing mental currency math.
+- **Gross / net VAT display mode**, per-row tax mode and rate.
+- **CSV and JSON import / export.**
+- **ASCII mascot screen (`m`)** — full-screen amber-on-black mascot in four tiered sizes that scale to your terminal. Esc returns.
+- **One-shot `--notice` CLI** for daily routines (Windows Task Scheduler, cron, login scripts).
 
 ## Daily notice on login (Windows)
 
@@ -64,7 +70,8 @@ See [docs/scheduler.md](docs/scheduler.md) for the Task Scheduler recipe — reg
 - Money is always `Decimal`, never `float`. SQLite stores it as TEXT via a registered adapter.
 - Dates are `datetime.date` objects throughout. Same TEXT-with-adapter pattern.
 - Subscriptions are never hard-deleted — `status = "cancelled"` is the terminal state.
-- Renewal calculation and notice generation live in the app. External schedulers (Task Scheduler, cron) are only the outer trigger.
+- Renewal calculation, notice generation, and the renewal ledger all live in the app. External schedulers (Task Scheduler, cron) are only the outer trigger.
+- Two-column 60:40 layout (table : notice board) optimised for compact terminals. The mascot lives on its own screen.
 
 Full architectural notes are in [CLAUDE.md](CLAUDE.md).
 
@@ -76,7 +83,7 @@ Built collaboratively with several AI models. Each contributed a distinct stage 
 - **Grok Imagine** — mascot character design
 - **Claude Sonnet 4.7** — initial scaffold and visual style
 - **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board, mascot)
-- **Claude Opus 4.7** — CLI entry point and release prep (Phase 5)
+- **Claude Opus 4.7** — Phases 5–6: CLI entry point, two-column restructure, mascot + history screens, auto-advance + renewal ledger, archive view, trial-expiry warnings, sort/totals/convert cycles, adaptive notice window, tutorial alt-state
 
 ## License
 

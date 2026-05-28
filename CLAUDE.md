@@ -37,13 +37,13 @@ gakkari/
   __main__.py        entry point — argparse for --notice / --lang, default launches TUI
   app.py             GakkariApp (Textual App subclass)
   cli.py             Phase 5 — render today's renewals + 7-day preview for stdout
-  db.py              SQLite helpers — schema, CRUD, exchange rate cache
-  models.py          Subscription, Settings, _MONTHLY_FACTORS, display helpers
+  db.py              SQLite helpers — schema, CRUD, exchange rate cache, renewal log
+  models.py          Subscription, Settings, RenewalLog, _MONTHLY_FACTORS, date helpers
   strings.py         i18n tables (EN + JA), fmt_* helpers
   currency.py        get_rate — frankfurter.app fetch + daily SQLite cache
   io.py              CSV + JSON import/export
-  mascot.py          tiered ASCII art loader (4 sizes, threshold-based pick)
-  notices.py         Phase 3 — pure logic for the 7-day notice board
+  mascot.py          tiered ASCII art loader (4 sizes; width-only picker for full-screen view)
+  notices.py         pure logic for the rolling notice board (1–2 week window, trial expiry)
   assets/
     mascot_40.txt    smallest tier (36 visible cols)
     mascot_50.txt    baseline tier (45 visible cols)
@@ -51,15 +51,19 @@ gakkari/
     mascot_90.txt    largest tier (79 visible cols)
   ui/
     __init__.py
-    main_screen.py        MainScreen — list + filter + totals + CRUD + notes + notice panel
+    main_screen.py        MainScreen — list + filter + totals + CRUD + notes + right panel
+    mascot_screen.py      MascotScreen — full-screen mascot view (m)
+    history_screen.py     HistoryScreen — renewal ledger with running total (h)
     confirm_modal.py      ConfirmModal — yes/no dialog
-    subscription_modal.py SubscriptionModal — add/edit form with validation
+    subscription_modal.py SubscriptionModal — add/edit form (incl. optional trial_ends)
     settings_modal.py     SettingsModal — base currency, gross/net, due-soon
     export_modal.py       ExportModal — format select + path
     import_modal.py       ImportModal — path with file-existence check
-    notice_panel.py       NoticePanel — right-column textboard widget
+    notice_panel.py       NoticePanel — right-column textboard + tutorial alt-state
 data/
   gakkari.db         created at first run (gitignored)
+docs/
+  scheduler.md       Windows Task Scheduler recipe for --notice
 ```
 
 ---
@@ -83,12 +87,22 @@ data/
 Subscription:
   id, name, amount (Decimal), currency, billing_period, next_renewal_date (date),
   category, notes, tax_mode, tax_rate (Decimal),
-  status  # "active" | "paused" | "cancelled"
+  status,            # "active" | "paused" | "cancelled"
+  trial_ends         # date | None — optional free-trial expiry
 
 Settings (singleton, id=1):
-  base_currency, price_display_mode,  # "net" | "gross"
+  base_currency, price_display_mode,           # "net" | "gross"
   due_soon_days (int),
-  mascot_enabled (bool), notices_enabled (bool)
+  mascot_enabled (bool), notices_enabled (bool),
+  language,                                     # "en" | "ja"
+  convert_column_enabled (bool),                # `c` row-level conversion column
+  totals_view_mode,                             # estimate | monthly_strict | yearly_strict | by_period
+  sort_mode                                     # date | period | name | amount
+
+RenewalLog:
+  id, subscription_id, renewed_on (date), amount (Decimal),
+  currency, billing_period
+  # one row written every time the user presses `k` to acknowledge a renewal
 
 ExchangeRateCache:
   base_currency, quote_currency, rate (Decimal), fetched_at (date)
@@ -97,7 +111,11 @@ ExchangeRateCache:
 
 `billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
 
-Subscriptions are never hard-deleted for historical accuracy — use `status = "cancelled"` instead. `is_active` from the original spec became a three-way `status` field.
+Subscriptions are never hard-deleted for historical accuracy — use `status = "cancelled"` instead. `is_active` from the original spec became a three-way `status` field. Cancelled rows are hidden by default; press `v` to surface them dimmed for reference.
+
+`trial_ends` is `None` for most subs. When set and within the notice window, the notice panel emits a louder trial-expiry post (distinct kaomoji pool, "trial ends today!" body) on the expiry date in place of (or alongside) the regular renewal post for that day.
+
+`RenewalLog` powers the history view (`h`) and the running-total-in-base-currency summary. Entries are append-only — the model trusts `k` presses as acknowledgements and never deletes log rows.
 
 ---
 
@@ -112,7 +130,9 @@ with get_conn() as conn:
     subs = list_subscriptions(conn)
 ```
 
-`init_db()` is called once on app mount. It is idempotent.
+`init_db()` is called once on app mount. It is idempotent: it creates the schema if missing, then runs a tuple of `ALTER TABLE ... ADD COLUMN` statements wrapped individually in `try/except sqlite3.OperationalError` so additive migrations on older DBs are safe to re-run.
+
+DB-write failures at the consumer level (settings load/save, history load) surface as `self.notify(..., severity="warning")` rather than silent swallows — see [gakkari/ui/main_screen.py](gakkari/ui/main_screen.py) `on_mount` / `_persist_settings` and [gakkari/ui/history_screen.py](gakkari/ui/history_screen.py) `on_mount`.
 
 ---
 
@@ -120,8 +140,10 @@ with get_conn() as conn:
 
 - Due-soon threshold comes from `Settings.due_soon_days` (default 7). Check with `Subscription.is_due_soon(threshold, today)`.
 - Totals must always respect the active `price_display_mode` and `base_currency`. Sum in the chosen display mode, not in raw amounts.
-- Weekly notices use a rolling 7-day window from today, not calendar weeks.
+- Notice window is adaptive: 7 days minimum (small terminals) up to 14 days when the right column has the vertical room. The window is computed by `NoticePanel._pick_window(height)`; floor stays at 7 so resizing down never *loses* posts.
 - Empty notice days still render a calm fallback message — the board must never look broken.
+- Each notice post is read from its own date's perspective — never "tomorrow" or "in N days." A renewal on the day a post represents always reads as "renews today!".
+- Rate-fetching for table render + totals goes through `MainScreen._build_rate_cache(subs)` — one lookup per unique currency per refresh pass. Sort-by-amount, the conversion column, and the totals computations all read from this shared dict; no per-row HTTP fan-out.
 - New features must strengthen clarity, local control, or recurring-use convenience. Style-only features get cut.
 
 ---
@@ -132,36 +154,55 @@ with get_conn() as conn:
 |---|---|---|
 | 1 | Subscription table, add/edit/delete, persistence, due-soon, keyboard nav | **Done** (Session 5) |
 | 2 | Totals, multi-currency, VAT mode, CSV/JSON import-export, filters | **Done** (Session 6) |
-| 3 | 7-day rolling textboard notice panel | **Done** (Session 7) |
-| 4 | ASCII mascot, final three-column layout polish | **Done** (Session 6) |
+| 3 | Rolling textboard notice panel | **Done** (Session 7) |
+| 4 | ASCII mascot, layout polish | **Done** (Session 6; restructured in Phase 6) |
 | 5 | CLI entrypoint, Windows Task Scheduler integration | **Done** (Session 8) |
+| 6 | Compact-terminal restructure + recurring-use features | **Done** (current session) |
 
-**Phases 1 and 2 are the finished product.** Phases 3, 4, 5 are all complete. The project is feature-complete per the original spec.
+### Phase 6 deltas
 
-### Current state (after Session 8 — CLI + Task Scheduler)
+- Layout went **three-column → two-column 60:40** (table : notice board). The mascot moved off the main screen into a dedicated `MascotScreen` accessed via `m` (Esc returns).
+- New keybindings on the main screen: `k` Kept it (auto-advance + ledger), `h` History, `v` Archive (cancelled subs), `c` Convert column, `t` Totals cycle, `o` Sort cycle.
+- Notice panel window is now adaptive (7–14 days) and its off-state shows a categorized **keybindings tutorial** instead of going blank.
+- New persisted state: `convert_column_enabled`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
+- DB-IO failure handling was tightened — bare `except Exception: pass` swallows around settings load/save and history load now surface as `notify(..., severity="warning")`.
 
-- Visual identity: PC-9800/CRT aesthetic — amber on black, double-line borders. Unchanged from Session 4.
-- `MainScreen` layout: title bar (mode/paused/totals/rate-fallback warning) → filter bar (`Input`) → `ContentSwitcher` between OptionList and notes view. Left panel renders the mascot; right panel renders the textboard notice stack.
-- Full CRUD: `SubscriptionModal`, `ConfirmModal` (soft-delete). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
-- Phase 2 features wired in: multi-currency totals via `currency.get_rate` (frankfurter, daily SQLite cache, fallback rate also cached so bad codes don't burn HTTP timeouts); gross/net display mode (`g`); paused toggle (`p`); text filter (`/`); settings modal (`s`); CSV/JSON export (`x`) and import (`i`).
-- Mascot: four locked-size art tiers in `gakkari/assets/` (40, 50, 70, 90 chars wide). `gakkari/mascot.py` picks the largest tier whose `min_panel_width` and `min_panel_height` fit; below the smallest tier the panel stays empty. Bottom-aligned, horizontally centered, no_wrap-cropped to prevent line-garble at narrow widths. `m` key toggles `Settings.mascot_enabled`. Re-renders on resize via `call_after_refresh` using `self.app.size` (not `panel.content_size`, which lags).
-- Notice panel (Phase 3): textboard aesthetic — banner + 7 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Always-JA single-char weekday labels regardless of UI language; bodies are EN/JA. **Each post is read from its own date's perspective** — a renewal on the day a post represents always reads as "renews today!", never "tomorrow" or "in N days". Two kaomoji pools (5 each) — renewal-day pool (shock / `ｷﾀ━━━` / flushed / sweat-shock / giko grin) and empty-day pool (smug / shobon / disinterest / orz / friendly). Face and empty-day message both picked deterministically by `post_id` hash, so the same day always renders identically across refreshes. Refreshes on mount, resize, language toggle, and any CRUD action. 60-second `set_interval` tick watches for date rollover so the panel and center list both advance to the new "today" when the app is left open past midnight. A dim `〜 終 〜` thread-end marker closes the stack below post 7. `n` key toggles `Settings.notices_enabled`.
-- Currency-fallback warning: `· ⚠ rate fallback` appears in the title-bar indicators when any active sub's currency lookup returns `Decimal("1")` for a non-base currency (e.g. user typed `YEN` instead of `JPY`). Detected during the existing `_total_monthly_in_base` rate-fetch pass; set is rebuilt each call, so the warning clears as soon as the offending sub is fixed or removed.
-- i18n: full EN+JA bundle covering the Phase 3 surface (banner, body templates, empty-day pool, fallback warning, footer label).
-- `billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
-- CLI (Phase 5): `python -m gakkari --notice` reads the DB and prints today's renewals + a 7-day preview to stdout, then exits. Designed to be called from Windows Task Scheduler on login. `--lang en|ja` overrides the saved UI language. `sys.stdout.reconfigure(encoding="utf-8")` keeps the JA banner and kaomoji from crashing the legacy Console Host. Task Scheduler recipe lives in `gakkari_docs/scheduler.md`.
+### Current state (after Phase 6)
+
+- **Visual identity:** PC-9800/CRT aesthetic — amber on black, double-line borders. Unchanged.
+- **`MainScreen` layout:** two-column. Left 60% = `#center-panel` (title bar with mode/paused/sort/conv/cancelled indicators → filter `Input` → `ContentSwitcher` between `OptionList` and notes `TextArea`). Right 40% = `#right-panel` (NoticePanel).
+- **Full CRUD:** `SubscriptionModal`, `ConfirmModal` (soft-delete via `status = "cancelled"`). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
+- **Sort cycle (`o`):** date → period → name → amount. Sort happens in-memory in `_refresh_view` after filtering; sort by amount uses the rate cache so cross-currency comparisons are meaningful. Indicator `· sort:<mode>` shown when not default.
+- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`).
+- **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. Rows where the sub currency equals `base_currency` show `—` in place of the conversion. Toggle indicator `· conv→<base>` in the title bar.
+- **Auto-advance (`k`):** advances the highlighted sub's `next_renewal_date` by one billing cycle (`Subscription.next_renewal_after`, with month-end clamping via `_add_months` and leap-year safety) AND writes a `renewal_log` row at the *old* date. Toast confirms `name: old → new`.
+- **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.
+- **Archive view (`v`):** cycles cancelled subs in/out of the visible list, dimmed throughout so they read as for-reference. Title-bar indicator `· +archive`.
+- **Trial expiry:** optional `trial_ends` field on `Subscription`. Notice panel detects trial endings in its window and emits a distinct trial-flavor post (alarmed kaomoji pool: `(((;ﾟДﾟ)))`, `(´；ω；｀)`, etc.; `"trial ends today!"` body) on the expiry day, taking priority over the regular renewal post if both fall on the same day.
+- **Mascot screen (`m`):** `MascotScreen` renders the art using `load_mascot_by_width` (width-only tier pick — full screen has no narrow column to starve into the smallest tier). Vertical centering when art fits, bottom-anchored crop when it doesn't (head clips off, feet stay). Art is built into `Static`'s constructor inside `compose()` to avoid a Textual pilot-mode crash that surfaced when art was set via `query_one().update()` from `on_mount`.
+- **Notice panel (`n` cycles):**
+  - **Notices state (default):** banner + 7-to-14 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Three pools (renewal / trial / empty) picked deterministically by `post_id` hash so the same day always renders identically. Always-JA single-char weekday labels; EN/JA bodies. Adaptive window via `_pick_window(height)`. 60-second `set_interval` tick watches for date rollover.
+  - **Tutorial state:** categorized keybindings cheat sheet (Editing / Views & filters / Screens / App) in the same textboard styling. Replaces the textboard rather than blanking the column.
+- **Currency-fallback warning:** `· ⚠ rate` in the title bar when any visible sub's lookup returns `Decimal("1")` for a non-base currency. Rebuilt each refresh in `_build_rate_cache`; clears as soon as the offending sub is fixed or removed.
+- **i18n:** full EN+JA bundle covering all surfaces. Always-JA weekday labels are intentional flavor (textboard authenticity).
+- **CLI (Phase 5):** `python -m gakkari --notice` reads the DB and prints today's renewals + a 7-day preview to stdout, then exits. Designed to be called from Windows Task Scheduler on login. `--lang en|ja` overrides the saved UI language. `sys.stdout.reconfigure(encoding="utf-8")` keeps the JA banner and kaomoji from crashing the legacy Console Host. Task Scheduler recipe lives in [docs/scheduler.md](docs/scheduler.md).
 
 ---
 
-## Target layout (Phase 4)
+## Layout
 
-Three-column, mascot always visible:
+Two-column 60:40, mascot off-screen by default:
 
 ```
-┌──────────────┬────────────────────────────────┬──────────────────────┐
-│  ASCII       │  Subscription table + totals   │  Weekly notice board │
-│  mascot      │  (center of gravity)           │  7-day rolling       │
-└──────────────┴────────────────────────────────┴──────────────────────┘
+┌────────────────────────────────────────┬────────────────────────────────┐
+│  Subscription table + totals           │  Notice board / Tutorial       │
+│  (60% — center of gravity)             │  (40% — adaptive 7–14 day)    │
+│                                        │                                │
+│  title bar · filter · rows · notes     │  banner · post 1 … post N     │
+└────────────────────────────────────────┴────────────────────────────────┘
+                          press `m` to view mascot
+                          press `h` to view renewal history
+                          press `n` to flip notice board ↔ tutorial
 ```
 
-The table is always the functional and visual center. Mascot and notice board support it.
+The table is the functional and visual center. The notice board supports it; the mascot is presentation polish on a dedicated screen.
