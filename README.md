@@ -4,6 +4,8 @@
 
 A calm, local-only terminal subscription tracker. Python + Textual TUI, SQLite storage. No accounts, no cloud, no telemetry — the database file lives next to the code.
 
+**[Project site →](https://kenrinzero.github.io/gakkari-ol/)**
+
 ```
 [Gakkari OL] Upcoming renewals — 2026-05-12 (火)
 ───────────────────────────────────────────────
