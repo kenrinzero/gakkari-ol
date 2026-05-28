@@ -33,6 +33,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_add": "Add",
         "bind_edit": "Edit",
         "bind_delete": "Delete",
+        "bind_advance": "Kept it",
         "bind_quit": "Quit",
         "bind_help": "Help",
         "bind_lang": "Lang",
@@ -40,10 +41,14 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_filter": "Filter",
         "bind_gross_net": "Gross/Net",
         "bind_paused": "Paused",
+        "bind_archive": "Archive",
         "bind_settings": "Settings",
         "bind_export": "Export",
         "bind_import": "Import",
         "bind_notices": "Notices",
+        "bind_sort": "Sort",
+        "bind_totals": "Totals",
+        "bind_convert": "Convert",
         # Phase 2 UI
         "filter_placeholder": "Filter by name or category…",
         "totals_monthly": "monthly",
@@ -51,10 +56,47 @@ _STRINGS: dict[str, dict[str, str]] = {
         "display_net": "net",
         "display_gross": "gross",
         "paused_shown": "+paused",
+        "cancelled_shown": "+archive",
         "rate_fallback_warning": "rate",
+        # Sort modes (Phase 6)
+        "sort_date": "date",
+        "sort_period": "period",
+        "sort_name": "name",
+        "sort_amount": "amount",
+        "indicator_sort": "sort:{mode}",
+        # Totals view modes (Phase 6)
+        "totals_mode_estimate": "estimate",
+        "totals_mode_monthly_strict": "monthly only",
+        "totals_mode_yearly_strict": "yearly only",
+        "totals_mode_by_period": "by period",
+        # Conversion column (Phase 6)
+        "indicator_conv": "conv→{base}",
+        # Mascot screen (Phase 6)
+        "mascot_screen_title": "Mascot",
+        "mascot_screen_hint": "[Esc] to return",
+        "mascot_screen_too_small": "Terminal too small for mascot.",
+        # Auto-advance (Phase 6)
+        "advance_notify": "{name}: {old} → {new}",
+        # History screen (Phase 6)
+        "bind_history": "History",
+        "bind_notes": "Notes",
+        "history_title": "Renewal history — {count} entries · total {base} {total}",
+        "history_title_empty": "Renewal history",
+        "history_empty_msg": "No renewals logged yet. Press [k] on a sub to log one.",
+        # DB error notifications (Phase 6)
+        "settings_load_error": "Could not load settings: {err}",
+        "settings_save_error": "Could not save settings: {err}",
+        "history_load_error": "Could not load history: {err}",
+        # Tutorial panel (Phase 6)
+        "tutorial_title": "Keybindings",
+        "tutorial_section_editing": "Editing",
+        "tutorial_section_views": "Views & filters",
+        "tutorial_section_screens": "Screens",
+        "tutorial_section_app": "App",
         # Notice panel (Phase 3)
         "notice_thread_title": "Upcoming renewals",
         "notice_renews_today": "{name} renews today!",
+        "notice_trial_ends": "{name} trial ends today!",
         "notice_plus_n_more": "+ {n} more",
         "notice_empty_1": "No renewals today",
         "notice_empty_2": "Nothing scheduled",
@@ -77,7 +119,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "Exported {count} subscription(s) to {path}",
         # Misc UI
         "title_shortcuts": "Keyboard shortcuts",
-        "help_text": "a Add · e Edit · d Delete · / Filter · g Gross/Net · p Paused · s Settings · x Export · i Import · L Lang · m Mascot · n Notices · q Quit",
+        "help_text": "a Add · e Edit · d Delete · k Kept it · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · L Lang · m Mascot · n Notices · q Quit",
         "no_subs": "No subscriptions. Press [a] to add one.",
         "due_soon": "▲ DUE SOON",
         "no_notes": "no notes",
@@ -112,6 +154,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "field_notes": "Notes",
         "field_tax_mode": "Tax mode",
         "field_tax_rate": "Tax rate (%)",
+        "field_trial_ends": "Trial ends (optional)",
         # Due-soon inline
         "due_days": "days",
         # Known categories
@@ -154,6 +197,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_add": "追加",
         "bind_edit": "編集",
         "bind_delete": "削除",
+        "bind_advance": "更新済",
         "bind_quit": "終了",
         "bind_help": "ヘルプ",
         "bind_lang": "言語",
@@ -161,10 +205,14 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_filter": "絞り込み",
         "bind_gross_net": "税込/税抜",
         "bind_paused": "停止中",
+        "bind_archive": "解約済",
         "bind_settings": "設定",
         "bind_export": "書出",
         "bind_import": "読込",
         "bind_notices": "通知",
+        "bind_sort": "並替",
+        "bind_totals": "合計",
+        "bind_convert": "換算",
         # Phase 2 UI
         "filter_placeholder": "名前・種別で絞り込み…",
         "totals_monthly": "月計",
@@ -172,10 +220,47 @@ _STRINGS: dict[str, dict[str, str]] = {
         "display_net": "税抜",
         "display_gross": "税込",
         "paused_shown": "+停止中",
+        "cancelled_shown": "+解約済",
         "rate_fallback_warning": "為替",
+        # Sort modes (Phase 6)
+        "sort_date": "日付",
+        "sort_period": "周期",
+        "sort_name": "名前",
+        "sort_amount": "金額",
+        "indicator_sort": "順:{mode}",
+        # Totals view modes (Phase 6)
+        "totals_mode_estimate": "概算",
+        "totals_mode_monthly_strict": "月次のみ",
+        "totals_mode_yearly_strict": "年次のみ",
+        "totals_mode_by_period": "周期別",
+        # Conversion column (Phase 6)
+        "indicator_conv": "換算→{base}",
+        # Mascot screen (Phase 6)
+        "mascot_screen_title": "OL娘",
+        "mascot_screen_hint": "[Esc] で戻る",
+        "mascot_screen_too_small": "画面が小さすぎます。",
+        # Auto-advance (Phase 6)
+        "advance_notify": "{name}：{old} → {new}",
+        # History screen (Phase 6)
+        "bind_history": "履歴",
+        "bind_notes": "メモ",
+        "history_title": "更新履歴 — {count}件 · 合計 {base} {total}",
+        "history_title_empty": "更新履歴",
+        "history_empty_msg": "履歴なし。サブスクで [k] を押して記録。",
+        # DB error notifications (Phase 6)
+        "settings_load_error": "設定の読込に失敗: {err}",
+        "settings_save_error": "設定の保存に失敗: {err}",
+        "history_load_error": "履歴の読込に失敗: {err}",
+        # Tutorial panel (Phase 6)
+        "tutorial_title": "操作一覧",
+        "tutorial_section_editing": "編集",
+        "tutorial_section_views": "表示・絞り込み",
+        "tutorial_section_screens": "画面",
+        "tutorial_section_app": "アプリ",
         # Notice panel (Phase 3)
         "notice_thread_title": "【週間】更新予定スレ",
         "notice_renews_today": "{name} 今日更新！",
+        "notice_trial_ends": "{name} 体験版終了！",
         "notice_plus_n_more": "他{n}件",
         "notice_empty_1": "今日は更新なし",
         "notice_empty_2": "予定なし",
@@ -198,7 +283,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "{count}件を {path} に書き出しました",
         # Misc UI
         "title_shortcuts": "キーボードショートカット",
-        "help_text": "a 追加 · e 編集 · d 削除 · / 絞込 · g 税込/抜 · p 停止中 · s 設定 · x 書出 · i 読込 · L 言語 · m 娘 · n 通知 · q 終了",
+        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · L 言語 · m 娘 · n 通知 · q 終了",
         "no_subs": "サブスクなし。[a] で追加。",
         "due_soon": "▲ 期限近",
         "no_notes": "メモなし",
@@ -233,6 +318,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "field_notes": "メモ",
         "field_tax_mode": "税区分",
         "field_tax_rate": "税率 (%)",
+        "field_trial_ends": "体験版終了日（任意）",
         # Due-soon inline
         "due_days": "日",
         # Known categories

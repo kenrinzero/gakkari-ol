@@ -24,23 +24,41 @@ from gakkari import io as gio
 from gakkari.currency import get_rate
 from gakkari.db import (
     get_conn,
+    insert_renewal,
     insert_subscription,
     list_subscriptions,
     load_settings,
     save_settings,
     update_subscription,
 )
-from gakkari.mascot import load_mascot
 from gakkari.models import Settings, Subscription
 from gakkari.strings import fmt_category, fmt_date, fmt_period, fmt_status, t
 from gakkari.ui.confirm_modal import ConfirmModal
 from gakkari.ui.export_modal import ExportModal
+from gakkari.ui.history_screen import HistoryScreen
 from gakkari.ui.import_modal import ImportModal
+from gakkari.ui.mascot_screen import MascotScreen
 from gakkari.ui.notice_panel import NoticePanel
 from gakkari.ui.settings_modal import SettingsModal
 from gakkari.ui.subscription_modal import SubscriptionModal
 
 LINE_WIDTH_FALLBACK = 30
+
+# Shortest-first; controls "sort by period" grouping.
+_PERIOD_ORDER: dict[str, int] = {
+    "weekly": 0,
+    "monthly": 1,
+    "quarterly": 2,
+    "half_yearly": 3,
+    "yearly": 4,
+}
+_SORT_CYCLE: tuple[str, ...] = ("date", "period", "name", "amount")
+_TOTALS_CYCLE: tuple[str, ...] = (
+    "estimate",
+    "monthly_strict",
+    "yearly_strict",
+    "by_period",
+)
 
 
 def _disp_width(s: str) -> int:
@@ -61,16 +79,22 @@ class MainScreen(Screen):
         Binding("a", "add", "Add"),
         Binding("e", "edit", "Edit"),
         Binding("d", "delete", "Delete"),
+        Binding("k", "advance_renewal", "Kept it"),
         Binding("right", "open_notes", "Notes", key_display="→", priority=True),
         Binding("slash", "focus_filter", "Filter", key_display="/"),
         Binding("g", "toggle_gross_net", "Gross/Net"),
         Binding("p", "toggle_paused", "Paused"),
+        Binding("v", "toggle_cancelled", "Archive"),
+        Binding("o", "cycle_sort", "Sort"),
+        Binding("t", "cycle_totals", "Totals"),
+        Binding("c", "toggle_convert", "Convert"),
         Binding("s", "settings", "Settings"),
         Binding("x", "export", "Export"),
         Binding("i", "import_subs", "Import"),
         Binding("l", "toggle_language", "Lang"),
         Binding("m", "toggle_mascot", "Mascot"),
         Binding("n", "toggle_notices", "Notices"),
+        Binding("h", "open_history", "History"),
         Binding("q", "quit", "Quit"),
         Binding("question_mark", "help", "Help", key_display="?"),
         Binding("escape", "back", "Back", key_display="Esc", priority=True),
@@ -92,28 +116,19 @@ class MainScreen(Screen):
         height: 1fr;
     }
 
-    #left-panel, #right-panel {
-        width: 33%;
-        background: #000000;
-        border: double #1A0D00;
-        color: #221100;
-    }
-
-    #left-panel {
-        color: #CC8800;
-        content-align: center bottom;
-    }
-
-    #right-panel {
-        color: #FFB000;
-        padding: 0 1;
-    }
-
     #center-panel {
-        width: 34%;
+        width: 60%;
         background: #000000;
         border: double #CC8800;
         padding: 0;
+    }
+
+    #right-panel {
+        width: 40%;
+        background: #000000;
+        border: double #1A0D00;
+        color: #FFB000;
+        padding: 0 1;
     }
 
     #title-bar {
@@ -190,16 +205,16 @@ class MainScreen(Screen):
         self._subs: list[Subscription] = []
         self._notes_active: bool = False
         self._notes_sub_idx: int = -1
-        self._mascot_enabled: bool = True
         self._notices_enabled: bool = True
         self._filter_text: str = ""
         self._show_paused: bool = True
+        self._show_cancelled: bool = False
         self._fallback_currencies: set[str] = set()
+        self._rate_cache: dict[str, Decimal] = {}
         self._last_seen_date: date = date.today()
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="layout"):
-            yield Static("", id="left-panel")
             with Vertical(id="center-panel"):
                 yield Static("がっかりOL", id="title-bar")
                 yield Input(placeholder="", id="filter-bar")
@@ -220,14 +235,16 @@ class MainScreen(Screen):
             with get_conn() as conn:
                 self._settings = load_settings(conn)
                 self._lang = self._settings.language
-                self._mascot_enabled = self._settings.mascot_enabled
                 self._notices_enabled = self._settings.notices_enabled
-        except Exception:
-            pass
+        except Exception as e:
+            self.notify(
+                t("settings_load_error", self._lang).format(err=e),
+                severity="warning",
+                timeout=6,
+            )
         self.query_one("#filter-bar", Input).placeholder = t(
             "filter_placeholder", self._lang
         )
-        self._render_mascot()
         # OptionList must own focus so single-letter bindings (a/e/d/g/p/...)
         # fire instead of being typed into the filter Input.
         self.query_one("#list-view", OptionList).focus()
@@ -240,55 +257,19 @@ class MainScreen(Screen):
         self.set_interval(60.0, self._check_date_rollover)
 
     def on_resize(self) -> None:
-        self.call_after_refresh(self._render_mascot)
         # Entry widths track the panel width; rebuild so rows fill the new
         # geometry instead of staying at the pre-resize width.
         self.call_after_refresh(self._refresh_view)
         # Notice panel rule widths follow the panel width too.
         self.call_after_refresh(self._refresh_notice_panel)
 
-    def _render_mascot(self) -> None:
-        try:
-            panel = self.query_one("#left-panel", Static)
-        except Exception:
-            return
-        if not self._mascot_enabled:
-            panel.update("")
-            return
-        # Derive panel size from the terminal/app size (always current),
-        # not from the widget's own measurements (which lag during resize
-        # and can pick the wrong art tier on the way down from fullscreen).
-        term = self.app.size
-        # Layout: #left-panel { width: 33%; border: double; }
-        inner_w = max(0, int(term.width * 0.33) - 2)
-        # Footer eats one row, border eats two more.
-        inner_h = max(0, term.height - 3)
-        text = load_mascot(inner_w, inner_h)
-        if not text:
-            panel.update("")
-            return
-        # Center the art horizontally inside its tier's "frame" — each line
-        # gets equal left padding based on the art's own max width (not the
-        # panel's), so the figure stays as a coherent block rather than each
-        # row drifting independently.
-        lines = text.split("\n")
-        art_w = max((len(l) for l in lines), default=0)
-        h_pad = max(0, (inner_w - art_w) // 2)
-        prefix = " " * h_pad
-        centered = [prefix + l for l in lines]
-        # Bottom-align: prepend blank lines so the figure sits grounded at
-        # the bottom of the panel.
-        v_pad = max(0, inner_h - len(centered))
-        block = "\n".join([""] * v_pad + centered)
-        # no_wrap + crop: each art line stays on its own row; never wraps
-        # into garbled fragments if a line exceeds inner_w.
-        panel.update(Text(block, no_wrap=True, overflow="crop"))
-
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if self._notes_active and action in (
             "add", "edit", "delete", "open_notes", "help", "toggle_mascot",
             "toggle_notices", "focus_filter", "toggle_gross_net",
             "toggle_paused", "settings", "export", "import_subs",
+            "cycle_sort", "cycle_totals", "toggle_convert", "advance_renewal",
+            "toggle_cancelled", "open_history",
         ):
             return False
         if not self._notes_active and action == "save_notes":
@@ -298,26 +279,74 @@ class MainScreen(Screen):
     # ── Data loading ────────────────────────────────────────────────────
 
     def _load_subs(self) -> None:
+        # Load every status — cancelled rows stay in memory so the archive
+        # toggle (`v`) can surface them without a DB re-read.
         with get_conn() as conn:
             self._all_subs = list_subscriptions(
-                conn, statuses=("active", "paused")
+                conn, statuses=("active", "paused", "cancelled")
             )
         self._refresh_view()
         self._refresh_notice_panel()
 
     def _refresh_view(self) -> None:
         needle = self._filter_text.strip().lower()
-        self._subs = [
+        filtered = [
             s for s in self._all_subs
             if (self._show_paused or s.status != "paused")
+            and (self._show_cancelled or s.status != "cancelled")
             and (
                 not needle
                 or needle in s.name.lower()
                 or needle in s.category.lower()
             )
         ]
+        # Fetch all rates we'll need this pass once, then hand the dict to
+        # sort/render/totals — avoids N HTTP calls and keeps fallback set
+        # in sync with what's actually on screen.
+        self._rate_cache = self._build_rate_cache(filtered)
+        self._subs = self._sort_subs(filtered)
         self._rebuild_list()
         self._update_title()
+
+    def _build_rate_cache(self, subs: list[Subscription]) -> dict[str, Decimal]:
+        base = self._settings.base_currency
+        rates: dict[str, Decimal] = {base: Decimal("1")}
+        needed = {s.currency for s in subs if s.currency and s.currency != base}
+        fallback: set[str] = set()
+        if needed:
+            with get_conn() as conn:
+                for cur in needed:
+                    r = get_rate(conn, cur, base)
+                    if r == Decimal("1") and cur != base:
+                        fallback.add(cur)
+                    rates[cur] = r
+        self._fallback_currencies = fallback
+        return rates
+
+    def _sort_subs(self, subs: list[Subscription]) -> list[Subscription]:
+        mode = self._settings.sort_mode
+        if mode == "period":
+            return sorted(
+                subs,
+                key=lambda s: (
+                    _PERIOD_ORDER.get(s.billing_period, 99),
+                    s.next_renewal_date,
+                ),
+            )
+        if mode == "name":
+            return sorted(subs, key=lambda s: s.name.lower())
+        if mode == "amount":
+            # Compare in base currency × monthly-equivalent — only meaningful
+            # cross-currency ordering. Highest-cost first matches the
+            # "what's burning my money" reading order.
+            disp = self._settings.price_display_mode
+            return sorted(
+                subs,
+                key=lambda s: s.monthly_equivalent(disp)
+                * self._rate_cache.get(s.currency, Decimal("1")),
+                reverse=True,
+            )
+        return sorted(subs, key=lambda s: s.next_renewal_date)
 
     def _line_width(self) -> int:
         try:
@@ -344,75 +373,137 @@ class MainScreen(Screen):
 
     def _update_title(self) -> None:
         title = self.query_one("#title-bar", Static)
-        mode = self._settings.price_display_mode
+        disp = self._settings.price_display_mode
         base = self._settings.base_currency
-        indicators = f" · {t(f'display_{mode}', self._lang)}"
+        lang = self._lang
+        indicators = f" · {t(f'display_{disp}', lang)}"
         if self._show_paused and any(s.status == "paused" for s in self._all_subs):
-            indicators += f" · {t('paused_shown', self._lang)}"
+            indicators += f" · {t('paused_shown', lang)}"
+        if self._show_cancelled and any(s.status == "cancelled" for s in self._all_subs):
+            indicators += f" · {t('cancelled_shown', lang)}"
+        if self._settings.sort_mode != "date":
+            sort_label = t(f"sort_{self._settings.sort_mode}", lang)
+            indicators += f" · {t('indicator_sort', lang).format(mode=sort_label)}"
+        if self._settings.convert_column_enabled:
+            indicators += f" · {t('indicator_conv', lang).format(base=base)}"
         if not self._subs:
             self._fallback_currencies = set()
             title.update(f"がっかりOL{indicators}")
             return
-        monthly = self._total_monthly_in_base(self._subs)
-        yearly = monthly * 12
         count = len(self._subs)
         warning = ""
         if self._fallback_currencies:
-            warning = f" · ⚠ {t('rate_fallback_warning', self._lang)}"
+            warning = f" · ⚠ {t('rate_fallback_warning', lang)}"
+        totals_str = self._format_totals(self._subs, base, lang)
         title.update(
             f"がっかりOL{indicators}  "
-            f"{count} {t('summary_subs', self._lang)} · "
-            f"{base} {monthly:,.2f}/{t('summary_monthly', self._lang)} · "
-            f"{base} {yearly:,.0f}/{t('summary_yearly', self._lang)}"
+            f"{count} {t('summary_subs', lang)} · "
+            f"{totals_str}"
             f"{warning}"
         )
 
+    def _format_totals(
+        self, subs: list[Subscription], base: str, lang: str
+    ) -> str:
+        mode = self._settings.totals_view_mode
+        if mode == "monthly_strict":
+            total = self._total_strict(subs, "monthly")
+            label = t("totals_mode_monthly_strict", lang)
+            return f"{base} {total:,.2f} · {label}"
+        if mode == "yearly_strict":
+            total = self._total_strict(subs, "yearly")
+            label = t("totals_mode_yearly_strict", lang)
+            return f"{base} {total:,.2f} · {label}"
+        if mode == "by_period":
+            breakdown = self._totals_by_period(subs)
+            if not breakdown:
+                return f"{base} 0 · {t('totals_mode_by_period', lang)}"
+            parts = [
+                f"{base} {amt:,.0f} {fmt_period(p, lang)}"
+                for p, amt in breakdown
+            ]
+            return " · ".join(parts)
+        # estimate (default): existing monthly+yearly normalized pair
+        monthly = self._total_monthly_in_base(subs)
+        yearly = monthly * 12
+        return (
+            f"{base} {monthly:,.2f}/{t('summary_monthly', lang)} · "
+            f"{base} {yearly:,.0f}/{t('summary_yearly', lang)}"
+        )
+
     def _total_monthly_in_base(self, subs: list[Subscription]) -> Decimal:
+        """Normalized monthly total — all periods folded to monthly equivalent."""
         active = [s for s in subs if s.status == "active"]
-        # Recompute each call: previously-fallback currencies may now be
-        # valid (or removed), so don't accumulate stale flags.
-        fallback: set[str] = set()
         if not active:
-            self._fallback_currencies = fallback
             return Decimal("0")
-        base = self._settings.base_currency
         mode = self._settings.price_display_mode
         total = Decimal("0")
-        with get_conn() as conn:
-            for sub in active:
-                rate = get_rate(conn, sub.currency, base)
-                # rate==1 for a non-base currency means the lookup failed
-                # and currency.py cached the safe fallback. Surface it so
-                # totals aren't silently wrong (e.g. user typed YEN not JPY).
-                if rate == Decimal("1") and sub.currency != base:
-                    fallback.add(sub.currency)
-                total += sub.monthly_equivalent(mode) * rate
-        self._fallback_currencies = fallback
+        for sub in active:
+            rate = self._rate_cache.get(sub.currency, Decimal("1"))
+            total += sub.monthly_equivalent(mode) * rate
         return total
+
+    def _total_strict(self, subs: list[Subscription], period: str) -> Decimal:
+        """Sum of active subs whose actual billing_period matches `period`."""
+        mode = self._settings.price_display_mode
+        total = Decimal("0")
+        for sub in subs:
+            if sub.status != "active" or sub.billing_period != period:
+                continue
+            rate = self._rate_cache.get(sub.currency, Decimal("1"))
+            total += sub.display_amount(mode) * rate
+        return total
+
+    def _totals_by_period(
+        self, subs: list[Subscription]
+    ) -> list[tuple[str, Decimal]]:
+        """Per-period subtotals in `_PERIOD_ORDER` order (only non-empty periods)."""
+        mode = self._settings.price_display_mode
+        bucket: dict[str, Decimal] = {}
+        for sub in subs:
+            if sub.status != "active":
+                continue
+            rate = self._rate_cache.get(sub.currency, Decimal("1"))
+            amt = sub.display_amount(mode) * rate
+            bucket[sub.billing_period] = bucket.get(sub.billing_period, Decimal("0")) + amt
+        ordered = sorted(
+            bucket.items(),
+            key=lambda kv: _PERIOD_ORDER.get(kv[0], 99),
+        )
+        return ordered
 
     def _render_entry(self, sub: Subscription) -> Text:
         w = self._line_width()
         today = date.today()
         mode = self._settings.price_display_mode
+        base = self._settings.base_currency
         due_threshold = self._settings.due_soon_days
         text = Text()
 
-        # Line 1: name + amount + notes dot
         name = sub.name
         amount_str = f"{sub.display_amount(mode):,.2f} {sub.currency}"
         notes_dot = " ●" if sub.notes else " ◌"
-        right1 = amount_str + notes_dot
+        conv_str = ""
+        if self._settings.convert_column_enabled:
+            if sub.currency == base:
+                conv_str = "  —"
+            else:
+                rate = self._rate_cache.get(sub.currency, Decimal("1"))
+                conv = sub.display_amount(mode) * rate
+                conv_str = f"  ≈ {conv:,.2f} {base}"
+        right1 = amount_str + conv_str + notes_dot
         pad1 = max(1, w - _disp_width(name) - _disp_width(right1))
         text.append(name, style="bold #FF8C00")
         text.append(" " * pad1)
         text.append(amount_str, style="#FFB000")
+        if conv_str:
+            text.append(conv_str, style="#CC6600")
         if sub.notes:
             text.append(notes_dot, style="#CC8800")
         else:
             text.append(notes_dot, style="#2A1500")
         text.append("\n")
 
-        # Line 2: period · date + due-soon marker
         period_str = fmt_period(sub.billing_period, self._lang)
         date_str = fmt_date(sub.next_renewal_date, self._lang)
         left2 = f"{period_str} · {date_str}"
@@ -433,7 +524,6 @@ class MainScreen(Screen):
             text.append(right2, style="bold #FF4444")
         text.append("\n")
 
-        # Line 3: category + status
         cat_str = fmt_category(sub.category, self._lang) if sub.category else "—"
         status_str = fmt_status(sub.status, self._lang)
         pad3 = max(1, w - _disp_width(cat_str) - _disp_width(status_str))
@@ -441,6 +531,10 @@ class MainScreen(Screen):
         text.append(" " * pad3)
         text.append(status_str, style="#554400")
 
+        # Cancelled rows are for-reference only — flatten the rich palette
+        # to a single dim color so the row reads as archived/dead.
+        if sub.status == "cancelled":
+            return Text(text.plain, style="#554400")
         return text
 
     def _current_sub(self) -> Subscription | None:
@@ -485,6 +579,36 @@ class MainScreen(Screen):
                 option_list.highlighted = min(
                     prev_idx or 0, len(self._subs) - 1
                 )
+
+    def action_advance_renewal(self) -> None:
+        sub = self._current_sub()
+        if sub is None or sub.status == "cancelled" or sub.id is None:
+            return
+        old_date = sub.next_renewal_date
+        sub.next_renewal_date = sub.next_renewal_after(old_date)
+        # Log the renewal at the *old* date — that's when the charge happened.
+        # The amount stored is whatever the user is currently being billed
+        # (display_amount picks net/gross per current mode).
+        renewal_amount = sub.display_amount(self._settings.price_display_mode)
+        with get_conn() as conn:
+            update_subscription(conn, sub)
+            insert_renewal(
+                conn,
+                subscription_id=sub.id,
+                renewed_on=old_date,
+                amount=renewal_amount,
+                currency=sub.currency,
+                billing_period=sub.billing_period,
+            )
+        self._load_subs()
+        self.notify(
+            t("advance_notify", self._lang).format(
+                name=sub.name,
+                old=fmt_date(old_date, self._lang),
+                new=fmt_date(sub.next_renewal_date, self._lang),
+            ),
+            timeout=4,
+        )
 
     @work
     async def action_delete(self) -> None:
@@ -613,6 +737,31 @@ class MainScreen(Screen):
         self._show_paused = not self._show_paused
         self._refresh_view()
 
+    def action_toggle_cancelled(self) -> None:
+        self._show_cancelled = not self._show_cancelled
+        self._refresh_view()
+
+    def action_cycle_sort(self) -> None:
+        cur = self._settings.sort_mode
+        idx = _SORT_CYCLE.index(cur) if cur in _SORT_CYCLE else 0
+        self._settings.sort_mode = _SORT_CYCLE[(idx + 1) % len(_SORT_CYCLE)]
+        self._persist_settings()
+        self._refresh_view()
+
+    def action_cycle_totals(self) -> None:
+        cur = self._settings.totals_view_mode
+        idx = _TOTALS_CYCLE.index(cur) if cur in _TOTALS_CYCLE else 0
+        self._settings.totals_view_mode = _TOTALS_CYCLE[(idx + 1) % len(_TOTALS_CYCLE)]
+        self._persist_settings()
+        self._update_title()
+
+    def action_toggle_convert(self) -> None:
+        self._settings.convert_column_enabled = (
+            not self._settings.convert_column_enabled
+        )
+        self._persist_settings()
+        self._refresh_view()
+
     @work
     async def action_settings(self) -> None:
         result = await self.app.push_screen_wait(
@@ -673,16 +822,23 @@ class MainScreen(Screen):
         try:
             with get_conn() as conn:
                 save_settings(conn, self._settings)
-        except Exception:
-            pass
+        except Exception as e:
+            self.notify(
+                t("settings_save_error", self._lang).format(err=e),
+                severity="warning",
+                timeout=6,
+            )
 
-    # ── Mascot toggle ───────────────────────────────────────────────────
+    # ── Mascot screen ───────────────────────────────────────────────────
 
     def action_toggle_mascot(self) -> None:
-        self._mascot_enabled = not self._mascot_enabled
-        self._settings.mascot_enabled = self._mascot_enabled
-        self._render_mascot()
-        self._persist_settings()
+        # `m` opens the dedicated mascot screen; Esc inside returns.
+        self.app.push_screen(MascotScreen(lang=self._lang))
+
+    # ── History screen ──────────────────────────────────────────────────
+
+    def action_open_history(self) -> None:
+        self.app.push_screen(HistoryScreen(lang=self._lang))
 
     # ── Notice panel ────────────────────────────────────────────────────
 
@@ -710,14 +866,19 @@ class MainScreen(Screen):
         # Derive inner width from the terminal size (matches mascot reasoning:
         # widget.content_size lags during resize transitions).
         term = self.app.size
-        # 33% column minus 2 cols of border minus 2 cols of horizontal padding.
-        width = max(20, int(term.width * 0.33) - 4)
+        # 40% column minus 2 cols of border minus 2 cols of horizontal padding.
+        width = max(20, int(term.width * 0.40) - 4)
+        # Inner height = full screen minus border (2) minus footer (1). Notice
+        # panel uses this to decide window size — short terminals stay at 7
+        # days, taller ones expand up to 14.
+        height = max(0, term.height - 3)
         panel.refresh_posts(
             self._all_subs,
             date.today(),
             self._lang,
             self._notices_enabled,
             width,
+            height,
         )
 
     # ── Misc ────────────────────────────────────────────────────────────

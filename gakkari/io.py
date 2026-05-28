@@ -10,7 +10,7 @@ from gakkari.models import Subscription
 
 _FIELDS = (
     "name", "amount", "currency", "billing_period", "next_renewal_date",
-    "category", "notes", "tax_mode", "tax_rate", "status",
+    "category", "notes", "tax_mode", "tax_rate", "status", "trial_ends",
 )
 
 
@@ -26,10 +26,13 @@ def _sub_to_row(sub: Subscription) -> dict[str, str]:
         "tax_mode": sub.tax_mode,
         "tax_rate": str(sub.tax_rate),
         "status": sub.status,
+        "trial_ends": sub.trial_ends.isoformat() if sub.trial_ends else "",
     }
 
 
 def _row_to_sub(row: dict) -> Subscription:
+    raw_trial = (row.get("trial_ends") or "").strip() if row.get("trial_ends") else ""
+    trial_ends = date.fromisoformat(raw_trial) if raw_trial else None
     return Subscription(
         id=None,
         name=str(row["name"]),
@@ -42,6 +45,7 @@ def _row_to_sub(row: dict) -> Subscription:
         tax_mode=str(row.get("tax_mode") or "none"),
         tax_rate=Decimal(str(row.get("tax_rate") or "0")),
         status=str(row.get("status") or "active"),
+        trial_ends=trial_ends,
     )
 
 
