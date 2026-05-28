@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from gakkari.models import Settings, Subscription
+from gakkari.models import RenewalLog, Settings, Subscription
 
 DB_PATH = Path(__file__).parent.parent / "data" / "gakkari.db"
 
@@ -44,16 +44,21 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     notes            TEXT    NOT NULL DEFAULT '',
     tax_mode         TEXT    NOT NULL DEFAULT 'none',
     tax_rate         DECIMAL NOT NULL DEFAULT '0',
-    status           TEXT    NOT NULL DEFAULT 'active'
+    status           TEXT    NOT NULL DEFAULT 'active',
+    trial_ends       DATE
 );
 
 CREATE TABLE IF NOT EXISTS settings (
-    id                 INTEGER PRIMARY KEY CHECK (id = 1),
-    base_currency      TEXT    NOT NULL DEFAULT 'USD',
-    price_display_mode TEXT    NOT NULL DEFAULT 'gross',
-    due_soon_days      INTEGER NOT NULL DEFAULT 7,
-    mascot_enabled     INTEGER NOT NULL DEFAULT 1,
-    notices_enabled    INTEGER NOT NULL DEFAULT 1
+    id                     INTEGER PRIMARY KEY CHECK (id = 1),
+    base_currency          TEXT    NOT NULL DEFAULT 'USD',
+    price_display_mode     TEXT    NOT NULL DEFAULT 'gross',
+    due_soon_days          INTEGER NOT NULL DEFAULT 7,
+    mascot_enabled         INTEGER NOT NULL DEFAULT 1,
+    notices_enabled        INTEGER NOT NULL DEFAULT 1,
+    language               TEXT    NOT NULL DEFAULT 'en',
+    convert_column_enabled INTEGER NOT NULL DEFAULT 0,
+    totals_view_mode       TEXT    NOT NULL DEFAULT 'estimate',
+    sort_mode              TEXT    NOT NULL DEFAULT 'date'
 );
 
 CREATE TABLE IF NOT EXISTS exchange_rate_cache (
@@ -63,6 +68,18 @@ CREATE TABLE IF NOT EXISTS exchange_rate_cache (
     fetched_at     DATE NOT NULL,
     PRIMARY KEY (base_currency, quote_currency)
 );
+
+CREATE TABLE IF NOT EXISTS renewal_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscription_id INTEGER NOT NULL,
+    renewed_on      DATE NOT NULL,
+    amount          DECIMAL NOT NULL,
+    currency        TEXT NOT NULL,
+    billing_period  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_renewal_log_date ON renewal_log(renewed_on);
+CREATE INDEX IF NOT EXISTS idx_renewal_log_sub ON renewal_log(subscription_id);
 """
 
 
@@ -87,12 +104,18 @@ def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
-        try:
-            conn.execute(
-                "ALTER TABLE settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'"
-            )
-        except sqlite3.OperationalError:
-            pass
+        _migrations: tuple[str, ...] = (
+            "ALTER TABLE settings ADD COLUMN language TEXT NOT NULL DEFAULT 'en'",
+            "ALTER TABLE settings ADD COLUMN convert_column_enabled INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE settings ADD COLUMN totals_view_mode TEXT NOT NULL DEFAULT 'estimate'",
+            "ALTER TABLE settings ADD COLUMN sort_mode TEXT NOT NULL DEFAULT 'date'",
+            "ALTER TABLE subscriptions ADD COLUMN trial_ends DATE",
+        )
+        for stmt in _migrations:
+            try:
+                conn.execute(stmt)
+            except sqlite3.OperationalError:
+                pass
 
 
 # ── Subscriptions ────────────────────────────────────────────────────────────
@@ -110,6 +133,7 @@ def _row_to_sub(row: sqlite3.Row) -> Subscription:
         tax_mode=row["tax_mode"],
         tax_rate=row["tax_rate"],
         status=row["status"],
+        trial_ends=row["trial_ends"],
     )
 
 
@@ -129,11 +153,11 @@ def insert_subscription(conn: sqlite3.Connection, sub: Subscription) -> int:
     cur = conn.execute(
         """INSERT INTO subscriptions
            (name, amount, currency, billing_period, next_renewal_date,
-            category, notes, tax_mode, tax_rate, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            category, notes, tax_mode, tax_rate, status, trial_ends)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (sub.name, sub.amount, sub.currency, sub.billing_period,
          sub.next_renewal_date, sub.category, sub.notes,
-         sub.tax_mode, sub.tax_rate, sub.status),
+         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends),
     )
     return cur.lastrowid
 
@@ -142,11 +166,11 @@ def update_subscription(conn: sqlite3.Connection, sub: Subscription) -> None:
     conn.execute(
         """UPDATE subscriptions SET
            name=?, amount=?, currency=?, billing_period=?, next_renewal_date=?,
-           category=?, notes=?, tax_mode=?, tax_rate=?, status=?
+           category=?, notes=?, tax_mode=?, tax_rate=?, status=?, trial_ends=?
            WHERE id=?""",
         (sub.name, sub.amount, sub.currency, sub.billing_period,
          sub.next_renewal_date, sub.category, sub.notes,
-         sub.tax_mode, sub.tax_rate, sub.status, sub.id),
+         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends, sub.id),
     )
 
 
@@ -166,6 +190,9 @@ def load_settings(conn: sqlite3.Connection) -> Settings:
         mascot_enabled=bool(row["mascot_enabled"]),
         notices_enabled=bool(row["notices_enabled"]),
         language=row["language"],
+        convert_column_enabled=bool(row["convert_column_enabled"]),
+        totals_view_mode=row["totals_view_mode"],
+        sort_mode=row["sort_mode"],
     )
 
 
@@ -173,10 +200,12 @@ def save_settings(conn: sqlite3.Connection, s: Settings) -> None:
     conn.execute(
         """UPDATE settings SET
            base_currency=?, price_display_mode=?, due_soon_days=?,
-           mascot_enabled=?, notices_enabled=?, language=?
+           mascot_enabled=?, notices_enabled=?, language=?,
+           convert_column_enabled=?, totals_view_mode=?, sort_mode=?
            WHERE id=1""",
         (s.base_currency, s.price_display_mode, s.due_soon_days,
-         int(s.mascot_enabled), int(s.notices_enabled), s.language),
+         int(s.mascot_enabled), int(s.notices_enabled), s.language,
+         int(s.convert_column_enabled), s.totals_view_mode, s.sort_mode),
     )
 
 
@@ -205,3 +234,57 @@ def upsert_rate(
         "  rate=excluded.rate, fetched_at=excluded.fetched_at",
         (base, quote, rate, today),
     )
+
+
+# ── Renewal log ──────────────────────────────────────────────────────────────
+
+def insert_renewal(
+    conn: sqlite3.Connection,
+    subscription_id: int,
+    renewed_on: date,
+    amount: Decimal,
+    currency: str,
+    billing_period: str,
+) -> int:
+    cur = conn.execute(
+        """INSERT INTO renewal_log
+           (subscription_id, renewed_on, amount, currency, billing_period)
+           VALUES (?, ?, ?, ?, ?)""",
+        (subscription_id, renewed_on, amount, currency, billing_period),
+    )
+    return cur.lastrowid
+
+
+def list_renewals(
+    conn: sqlite3.Connection,
+    subscription_id: int | None = None,
+    limit: int | None = None,
+) -> list[RenewalLog]:
+    """Recent-first list. Joins subscription name so the history view can
+    label entries even if the sub was later renamed or soft-deleted."""
+    sql = """
+        SELECT r.id, r.subscription_id, r.renewed_on, r.amount, r.currency,
+               r.billing_period, COALESCE(s.name, '') AS sub_name
+        FROM renewal_log r
+        LEFT JOIN subscriptions s ON s.id = r.subscription_id
+    """
+    params: tuple = ()
+    if subscription_id is not None:
+        sql += " WHERE r.subscription_id = ?"
+        params = (subscription_id,)
+    sql += " ORDER BY r.renewed_on DESC, r.id DESC"
+    if limit is not None:
+        sql += f" LIMIT {int(limit)}"
+    rows = conn.execute(sql, params).fetchall()
+    return [
+        RenewalLog(
+            id=r["id"],
+            subscription_id=r["subscription_id"],
+            renewed_on=r["renewed_on"],
+            amount=r["amount"],
+            currency=r["currency"],
+            billing_period=r["billing_period"],
+            sub_name=r["sub_name"],
+        )
+        for r in rows
+    ]

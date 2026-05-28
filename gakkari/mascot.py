@@ -49,3 +49,19 @@ def load_mascot(inner_width: int, inner_height: int) -> str | None:
             art = _read(name)
             return art if art else None
     return None
+
+
+def load_mascot_by_width(inner_width: int) -> str | None:
+    """Width-only tier pick — for views with vertical room to spare.
+
+    The dedicated mascot screen has the whole terminal, so height almost
+    never becomes a real ceiling; using ``load_mascot`` there would always
+    pick the smallest tier on short windows. Here we pick the largest tier
+    whose width fits, and trust the caller to bottom-anchor + crop so a
+    partly-clipped figure degrades gracefully on a short terminal.
+    """
+    for name, min_w, _ in _TIERS:
+        if inner_width >= min_w:
+            art = _read(name)
+            return art if art else None
+    return None

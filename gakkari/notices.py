@@ -36,6 +36,16 @@ _FACES_EMPTY = (
     "( ´∀｀)",
 )
 
+# Trial-expiry pool — alarmed / panicked, distinct from the renewal pool so a
+# day's "ohhh free trial just ended" reads differently from a normal renewal.
+_FACES_TRIAL = (
+    "(((;ﾟДﾟ)))",
+    "(´；ω；｀)",
+    "(ﾟдﾟ;)",
+    "(ﾉД`)",
+    "(；゜○゜)",
+)
+
 # Representative single faces — kept for any caller that wants a default.
 FACE_SHOCK = _FACES_RENEWAL[0]
 FACE_CALM = _FACES_EMPTY[0]
@@ -79,6 +89,11 @@ def _renewal_body(name: str, lang: str) -> str:
     return template.format(name=_truncate_name(name, _BODY_MAX - 14))
 
 
+def _trial_body(name: str, lang: str) -> str:
+    template = t("notice_trial_ends", lang)
+    return template.format(name=_truncate_name(name, _BODY_MAX - 14))
+
+
 def _empty_body(d: date, lang: str) -> str:
     # Deterministic pick by date so the same day always reads the same.
     seed = _post_id(d, "empty")
@@ -99,19 +114,33 @@ def build_notice_posts(
     (their next_renewal_date is still meaningful — the user paused but the
     renewal cycle hasn't been changed).
     """
-    by_date: dict[date, list[Subscription]] = {}
+    by_renewal: dict[date, list[Subscription]] = {}
+    by_trial_end: dict[date, list[Subscription]] = {}
     for sub in subs:
-        by_date.setdefault(sub.next_renewal_date, []).append(sub)
+        by_renewal.setdefault(sub.next_renewal_date, []).append(sub)
+        if sub.trial_ends:
+            by_trial_end.setdefault(sub.trial_ends, []).append(sub)
 
     posts: list[NoticePost] = []
     for i in range(window):
         d = today + timedelta(days=i)
-        renewing = by_date.get(d, [])
-        if not renewing:
-            body = _empty_body(d, lang)
-            face_pool = _FACES_EMPTY
-            is_renewal = False
-        else:
+        trial_ending = by_trial_end.get(d, [])
+        renewing = by_renewal.get(d, [])
+        if trial_ending:
+            # Trial expiry takes the post for that day — usually a paid renewal
+            # follows on or after this date, and the "first charge" warning is
+            # what the user actually wants surfaced.
+            primary = trial_ending[0]
+            body_line = _trial_body(primary.name, lang)
+            extras = len(trial_ending) - 1 + len(renewing)
+            if extras > 0:
+                more = t("notice_plus_n_more", lang).format(n=extras)
+                body = f"{body_line}\n{more}"
+            else:
+                body = body_line
+            face_pool = _FACES_TRIAL
+            is_renewal = True  # keep urgent palette on
+        elif renewing:
             primary = renewing[0]
             body_line = _renewal_body(primary.name, lang)
             if len(renewing) > 1:
@@ -121,6 +150,10 @@ def build_notice_posts(
                 body = body_line
             face_pool = _FACES_RENEWAL
             is_renewal = True
+        else:
+            body = _empty_body(d, lang)
+            face_pool = _FACES_EMPTY
+            is_renewal = False
         pid = _post_id(d, body)
         face = face_pool[int(pid, 16) % len(face_pool)]
         posts.append(

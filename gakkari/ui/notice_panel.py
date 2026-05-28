@@ -30,12 +30,16 @@ class NoticePanel(Static):
         lang: str,
         enabled: bool,
         width: int,
+        height: int = 0,
     ) -> None:
-        if not enabled:
-            self.update("")
-            return
         width = max(20, width)  # narrow-terminal floor; below this it'll just crop
-        posts = build_notice_posts(subs, today, lang)
+        if not enabled:
+            # Off-state isn't blank — flip the panel into a categorized
+            # keybindings tutorial so the column stays useful for onboarding.
+            self.update(self._render_tutorial(lang, width))
+            return
+        window = self._pick_window(height)
+        posts = build_notice_posts(subs, today, lang, window=window)
         banner = self._banner(lang, width)
         rendered = [banner]
         for post in posts:
@@ -46,6 +50,26 @@ class NoticePanel(Static):
         self.update(Group(*rendered))
 
     # ── internal ──────────────────────────────────────────────────────
+
+    # Avg lines per post = meta(1) + body(~1) + face(1) + rule(1). Some posts
+    # have a 2-line body (renewals with "+N more"), but multi-renewal days are
+    # rare enough that 4 is a useful average for sizing the rolling window.
+    _LINES_PER_POST = 4
+    _BANNER_LINES = 4   # top rule + title + bottom rule + blank
+    _END_LINES = 2      # blank + 〜 終 〜
+    _WINDOW_MIN = 7
+    _WINDOW_MAX = 14
+
+    def _pick_window(self, height: int) -> int:
+        """Pick how many days to render. 1 week on small terminals, up to 2
+        weeks when there's vertical room. Height ≤ 0 falls back to the
+        minimum so callers that don't pass a height still get sensible
+        behaviour."""
+        if height <= 0:
+            return self._WINDOW_MIN
+        room = max(0, height - self._BANNER_LINES - self._END_LINES)
+        fits = room // self._LINES_PER_POST
+        return max(self._WINDOW_MIN, min(self._WINDOW_MAX, fits))
 
     def _end_marker(self, width: int) -> Group:
         # Always-JA marker (same reasoning as the day labels — flavor over
@@ -58,6 +82,59 @@ class NoticePanel(Static):
         title = Text(t("notice_thread_title", lang), style="bold #FFB000", justify="center")
         title.truncate(width, overflow="ellipsis")
         return Group(rule, title, rule, Text(""))
+
+    def _render_tutorial(self, lang: str, width: int) -> Group:
+        """Build a textboard-styled keybindings cheatsheet for the off-state."""
+        rule = Text("─" * width, style="dim #CC8800")
+        title = Text(
+            t("tutorial_title", lang),
+            style="bold #FFB000",
+            justify="center",
+        )
+        title.truncate(width, overflow="ellipsis")
+        blocks: list = [rule, title, rule, Text("")]
+
+        sections: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+            ("tutorial_section_editing", (
+                ("a", "bind_add"),
+                ("e", "bind_edit"),
+                ("d", "bind_delete"),
+                ("k", "bind_advance"),
+                ("→", "bind_notes"),
+            )),
+            ("tutorial_section_views", (
+                ("/", "bind_filter"),
+                ("g", "bind_gross_net"),
+                ("p", "bind_paused"),
+                ("v", "bind_archive"),
+                ("o", "bind_sort"),
+                ("t", "bind_totals"),
+                ("c", "bind_convert"),
+            )),
+            ("tutorial_section_screens", (
+                ("m", "bind_mascot"),
+                ("h", "bind_history"),
+                ("n", "bind_notices"),
+            )),
+            ("tutorial_section_app", (
+                ("s", "bind_settings"),
+                ("x", "bind_export"),
+                ("i", "bind_import"),
+                ("L", "bind_lang"),
+                ("q", "bind_quit"),
+            )),
+        )
+
+        for section_key, items in sections:
+            blocks.append(Text(t(section_key, lang), style="bold #CC8800"))
+            for key, label_key in items:
+                line = Text("  ", no_wrap=True, overflow="crop")
+                line.append(key.ljust(3), style="bold #FFB000")
+                line.append(t(label_key, lang), style="#CC6600")
+                blocks.append(line)
+            blocks.append(Text(""))  # spacer between sections
+
+        return Group(*blocks)
 
     def _render_post(self, post, width: int) -> Group:
         # Urgent only when today (post 1) actually has a renewal — future

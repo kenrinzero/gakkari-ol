@@ -126,6 +126,9 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
             yield Label(t("field_status", lang), classes="field-label")
             yield Select(status_options, value="active", id="status")
 
+            yield Label(t("field_trial_ends", lang), classes="field-label")
+            yield Input(placeholder="YYYY-MM-DD (optional)", id="trial_ends")
+
             with Horizontal(id="button-row"):
                 yield Button(t("modal_save", lang), id="save", variant="primary")
                 yield Button(t("modal_cancel", lang), id="cancel")
@@ -144,6 +147,8 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
         self.query_one("#tax_mode", Select).value = s.tax_mode
         self.query_one("#tax_rate", Input).value = str(s.tax_rate)
         self.query_one("#status", Select).value = s.status
+        if s.trial_ends:
+            self.query_one("#trial_ends", Input).value = s.trial_ends.isoformat()
         self._update_tax_rate_state()
 
     def on_select_changed(self, event: Select.Changed) -> None:
@@ -217,6 +222,14 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
         if status is Select.BLANK:
             status = "active"
 
+        trial_str = self.query_one("#trial_ends", Input).value.strip()
+        trial_ends = None
+        if trial_str:
+            try:
+                trial_ends = date.fromisoformat(trial_str)
+            except (ValueError, TypeError):
+                errors.append(t("err_date_invalid", lang))
+
         if errors:
             self.notify(
                 "\n".join(errors),
@@ -237,6 +250,7 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
             tax_mode=tax_mode,
             tax_rate=tax_rate,
             status=status,
+            trial_ends=trial_ends,
             id=self._sub.id if self._sub else None,
         )
         self.dismiss(sub)

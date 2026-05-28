@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import calendar
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 BILLING_PERIODS = ("monthly", "yearly", "quarterly", "weekly", "half_yearly")
 STATUSES = ("active", "paused", "cancelled")
 TAX_MODES = ("none", "inclusive", "exclusive")
 PRICE_DISPLAY_MODES = ("net", "gross")
+TOTALS_VIEW_MODES = ("estimate", "monthly_strict", "yearly_strict", "by_period")
+SORT_MODES = ("date", "period", "name", "amount")
 
 _MONTHLY_FACTORS: dict[str, Decimal] = {
     "monthly": Decimal("1"),
@@ -30,6 +33,7 @@ class Subscription:
     tax_mode: str = "none"
     tax_rate: Decimal = field(default_factory=lambda: Decimal("0"))
     status: str = "active"
+    trial_ends: date | None = None
     id: int | None = None
 
     def days_until_renewal(self, today: date | None = None) -> int:
@@ -59,6 +63,50 @@ class Subscription:
         factor = _MONTHLY_FACTORS.get(self.billing_period, Decimal("1"))
         return self.display_amount(mode) * factor
 
+    def next_renewal_after(self, from_date: date | None = None) -> date:
+        """Return what next_renewal_date should be after one more billing cycle.
+
+        Used by the `k` keybinding to advance a sub after it's been charged.
+        Clamps the day-of-month down for short months (Jan 31 → Feb 28/29).
+        """
+        d = from_date or self.next_renewal_date
+        if self.billing_period == "weekly":
+            return d + timedelta(days=7)
+        if self.billing_period == "monthly":
+            return _add_months(d, 1)
+        if self.billing_period == "quarterly":
+            return _add_months(d, 3)
+        if self.billing_period == "half_yearly":
+            return _add_months(d, 6)
+        if self.billing_period == "yearly":
+            return _add_months(d, 12)
+        # Unknown period — degrade to monthly to avoid crashing.
+        return _add_months(d, 1)
+
+
+def _add_months(d: date, months: int) -> date:
+    total = d.month - 1 + months
+    year = d.year + total // 12
+    month = total % 12 + 1
+    day = min(d.day, calendar.monthrange(year, month)[1])
+    return date(year, month, day)
+
+
+@dataclass
+class RenewalLog:
+    """One row per acknowledged renewal — written when the user presses `k`.
+
+    Builds a running record of actual spending over time, separate from the
+    forward-looking estimates the title bar shows.
+    """
+    subscription_id: int
+    renewed_on: date
+    amount: Decimal
+    currency: str
+    billing_period: str
+    sub_name: str = ""  # populated by list_renewals via JOIN
+    id: int | None = None
+
 
 @dataclass
 class Settings:
@@ -68,4 +116,7 @@ class Settings:
     mascot_enabled: bool = True
     notices_enabled: bool = True
     language: str = "en"
+    convert_column_enabled: bool = False
+    totals_view_mode: str = "estimate"
+    sort_mode: str = "date"
     id: int | None = None
