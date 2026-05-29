@@ -5,16 +5,10 @@ from pathlib import Path
 _ASSETS = Path(__file__).parent / "assets"
 _CACHE: dict[str, str] = {}
 
-# Each tier: (name, min_panel_width, min_panel_height).
-# min_panel_height is intentionally lower than the art's true line count —
-# we'd rather show a partly-clipped figure than nothing.
-# Tiers ordered largest first; first one whose minimums fit wins.
-_TIERS: tuple[tuple[str, int, int], ...] = (
-    ("90", 79, 60),
-    ("70", 62, 45),
-    ("50", 45, 30),
-    ("40", 36, 22),
-)
+# Art tiers, largest first. ``load_mascot_fit`` measures each tier's actual
+# size and picks the largest that fully fits the terminal, so the old per-tier
+# minimum width/height thresholds are no longer needed.
+_TIERS: tuple[str, ...] = ("90", "70", "50", "40")
 
 
 def _trim(text: str) -> str:
@@ -43,25 +37,26 @@ def _read(name: str) -> str:
     return _CACHE[name]
 
 
-def load_mascot(inner_width: int, inner_height: int) -> str | None:
-    for name, min_w, min_h in _TIERS:
-        if inner_width >= min_w and inner_height >= min_h:
-            art = _read(name)
-            return art if art else None
-    return None
+def load_mascot_fit(inner_width: int, inner_height: int) -> str | None:
+    """Largest tier whose *actual* art fits fully inside the given box.
 
-
-def load_mascot_by_width(inner_width: int) -> str | None:
-    """Width-only tier pick — for views with vertical room to spare.
-
-    The dedicated mascot screen has the whole terminal, so height almost
-    never becomes a real ceiling; using ``load_mascot`` there would always
-    pick the smallest tier on short windows. Here we pick the largest tier
-    whose width fits, and trust the caller to bottom-anchor + crop so a
-    partly-clipped figure degrades gracefully on a short terminal.
+    The dedicated mascot screen wants the biggest figure that still shows in
+    full — no clipped head. Each tier's true measured size is checked against
+    both width and height (the figures are much taller than the old looser
+    thresholds, so width-only picking cropped the head on wide-but-short
+    windows). Tiers are largest-first, so the first that fits wins. If even
+    the smallest tier is too big for the box, its art is returned anyway so the
+    caller can bottom-anchor + crop rather than show nothing.
     """
-    for name, min_w, _ in _TIERS:
-        if inner_width >= min_w:
-            art = _read(name)
-            return art if art else None
-    return None
+    smallest = ""
+    for name in _TIERS:  # largest first
+        art = _read(name)
+        if not art:
+            continue
+        smallest = art  # largest-first => last assignment is the smallest tier
+        lines = art.split("\n")
+        height = len(lines)
+        width = max((len(line) for line in lines), default=0)
+        if width <= inner_width and height <= inner_height:
+            return art
+    return smallest or None

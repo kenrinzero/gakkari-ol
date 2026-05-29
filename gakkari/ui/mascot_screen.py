@@ -8,7 +8,7 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Static
 
-from gakkari.mascot import load_mascot_by_width
+from gakkari.mascot import load_mascot_fit
 from gakkari.strings import t
 
 
@@ -96,13 +96,15 @@ class MascotScreen(Screen):
         self.query_one("#mascot-art", Static).update(self._compose_art())
 
     def _compose_art(self) -> Text:
-        # Width-only tier pick: the dedicated screen has the whole terminal,
-        # so width is the real constraint — using load_mascot's height check
-        # would always fall back to the smallest tier on short windows.
+        # Pick the largest art that fully fits the box — width AND height — so
+        # the whole figure shows instead of clipping the head on a wide-but-
+        # short window. load_mascot_fit falls back to the smallest tier when
+        # even that is too big; the crop branch below then keeps the feet and
+        # lets the head clip off, as a last resort.
         term = self.app.size
         inner_w = max(0, term.width - 2)
         inner_h = max(0, term.height - 4)
-        text = load_mascot_by_width(inner_w)
+        text = load_mascot_fit(inner_w, inner_h)
         if not text:
             return Text(
                 t("mascot_screen_too_small", self._lang),

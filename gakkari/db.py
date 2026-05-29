@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS settings (
     price_display_mode     TEXT    NOT NULL DEFAULT 'gross',
     due_soon_days          INTEGER NOT NULL DEFAULT 7,
     monthly_income         DECIMAL NOT NULL DEFAULT '0',
+    monthly_income_currency TEXT   NOT NULL DEFAULT '',
     mascot_enabled         INTEGER NOT NULL DEFAULT 1,
     notices_enabled        INTEGER NOT NULL DEFAULT 1,
     language               TEXT    NOT NULL DEFAULT 'en',
@@ -111,6 +112,7 @@ def init_db() -> None:
             "ALTER TABLE settings ADD COLUMN convert_column_enabled INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE settings ADD COLUMN convert_currency TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE settings ADD COLUMN monthly_income DECIMAL NOT NULL DEFAULT '0'",
+            "ALTER TABLE settings ADD COLUMN monthly_income_currency TEXT NOT NULL DEFAULT ''",
             "ALTER TABLE settings ADD COLUMN totals_view_mode TEXT NOT NULL DEFAULT 'estimate'",
             "ALTER TABLE settings ADD COLUMN sort_mode TEXT NOT NULL DEFAULT 'date'",
             "ALTER TABLE subscriptions ADD COLUMN trial_ends DATE",
@@ -192,6 +194,7 @@ def load_settings(conn: sqlite3.Connection) -> Settings:
         price_display_mode=row["price_display_mode"],
         due_soon_days=row["due_soon_days"],
         monthly_income=row["monthly_income"],
+        monthly_income_currency=row["monthly_income_currency"],
         mascot_enabled=bool(row["mascot_enabled"]),
         notices_enabled=bool(row["notices_enabled"]),
         language=row["language"],
@@ -206,12 +209,14 @@ def save_settings(conn: sqlite3.Connection, s: Settings) -> None:
     conn.execute(
         """UPDATE settings SET
            base_currency=?, price_display_mode=?, due_soon_days=?,
-           monthly_income=?, mascot_enabled=?, notices_enabled=?, language=?,
+           monthly_income=?, monthly_income_currency=?,
+           mascot_enabled=?, notices_enabled=?, language=?,
            convert_column_enabled=?, convert_currency=?,
            totals_view_mode=?, sort_mode=?
            WHERE id=1""",
         (s.base_currency, s.price_display_mode, s.due_soon_days,
-         s.monthly_income, int(s.mascot_enabled), int(s.notices_enabled),
+         s.monthly_income, s.monthly_income_currency,
+         int(s.mascot_enabled), int(s.notices_enabled),
          s.language, int(s.convert_column_enabled), s.convert_currency,
          s.totals_view_mode, s.sort_mode),
     )
