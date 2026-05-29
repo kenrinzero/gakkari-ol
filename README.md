@@ -60,7 +60,6 @@ The SQLite database is created on first launch at `data/gakkari.db` inside the p
 - **Conversion column (`c`)** — show each row's amount in your base currency next to its native price, so you stop doing mental currency math.
 - **Gross / net VAT display mode**, per-row tax mode and rate.
 - **CSV and JSON import / export.**
-- **ASCII mascot screen (`m`)** — full-screen amber-on-black mascot in four tiered sizes that scale to your terminal. Esc returns.
 - **One-shot `--notice` CLI** for daily routines (Windows Task Scheduler, cron, login scripts).
 
 ## Daily notice on login (Windows)
@@ -73,7 +72,7 @@ See [docs/scheduler.md](docs/scheduler.md) for the Task Scheduler recipe — reg
 - Dates are `datetime.date` objects throughout. Same TEXT-with-adapter pattern.
 - Subscriptions are never hard-deleted — `status = "cancelled"` is the terminal state.
 - Renewal calculation, notice generation, and the renewal ledger all live in the app. External schedulers (Task Scheduler, cron) are only the outer trigger.
-- Two-column 60:40 layout (table : notice board) optimised for compact terminals. The mascot lives on its own screen.
+- Two-column 60:40 layout (table : notice board) optimised for compact terminals.
 
 Full architectural notes are in [CLAUDE.md](CLAUDE.md).
 

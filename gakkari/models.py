@@ -115,7 +115,6 @@ class Settings:
     due_soon_days: int = 7
     monthly_income: Decimal = field(default_factory=lambda: Decimal("0"))  # 0 = unset
     monthly_income_currency: str = ""  # blank → follow base_currency
-    mascot_enabled: bool = True
     notices_enabled: bool = True
     language: str = "en"
     convert_column_enabled: bool = False

@@ -185,7 +185,7 @@ class SettingsModal(ModalScreen[Settings | None]):
             return
 
         # replace() carries over every field this modal doesn't edit
-        # (mascot/notices/language and the view-state fields convert_column_
+        # (notices/language and the view-state fields convert_column_
         # enabled / totals_view_mode / sort_mode), which a fresh Settings(...)
         # would silently reset to defaults.
         out = replace(
