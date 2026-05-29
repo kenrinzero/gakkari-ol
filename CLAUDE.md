@@ -2,7 +2,7 @@
 
 Terminal subscription tracker. Python + Textual TUI, SQLite storage, local-only.
 
-**Tone:** calm, serious, readable, slightly stylized. The anime office-lady mascot is presentation polish added in Phase 4 — it is not the product. No gamification.
+**Tone:** calm, serious, readable, slightly stylized. No gamification. (A Phase-4 anime office-lady mascot screen was added and later removed — it was presentation polish, not the product.)
 
 ---
 
@@ -42,17 +42,10 @@ gakkari/
   strings.py         i18n tables (EN + JA), fmt_* helpers
   currency.py        get_rate — frankfurter.app fetch + daily SQLite cache
   io.py              CSV + JSON import/export
-  mascot.py          tiered ASCII art loader (4 sizes; width-only picker for full-screen view)
   notices.py         pure logic for the rolling notice board (1–2 week window, trial expiry)
-  assets/
-    mascot_40.txt    smallest tier (36 visible cols)
-    mascot_50.txt    baseline tier (45 visible cols)
-    mascot_70.txt    large tier (62 visible cols)
-    mascot_90.txt    largest tier (79 visible cols)
   ui/
     __init__.py
     main_screen.py        MainScreen — list + filter + totals + CRUD + notes + right panel
-    mascot_screen.py      MascotScreen — full-screen mascot view (m)
     history_screen.py     HistoryScreen — renewal ledger with running total (h)
     confirm_modal.py      ConfirmModal — yes/no dialog
     subscription_modal.py SubscriptionModal — add/edit form (incl. optional trial_ends)
@@ -99,7 +92,7 @@ Settings (singleton, id=1):
   due_soon_days (int),
   monthly_income (Decimal),                     # 0 = unset (powers the `income` totals mode)
   monthly_income_currency,                      # income's own currency; blank → follow base_currency
-  mascot_enabled (bool), notices_enabled (bool),
+  notices_enabled (bool),
   language,                                     # "en" | "ja"
   convert_column_enabled (bool),                # `c` row-level conversion column
   convert_currency,                             # `c` column target; blank → follow base_currency
@@ -162,13 +155,13 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 | 1 | Subscription table, add/edit/delete, persistence, due-soon, keyboard nav | **Done** (Session 5) |
 | 2 | Totals, multi-currency, VAT mode, CSV/JSON import-export, filters | **Done** (Session 6) |
 | 3 | Rolling textboard notice panel | **Done** (Session 7) |
-| 4 | ASCII mascot, layout polish | **Done** (Session 6; restructured in Phase 6) |
+| 4 | ASCII mascot, layout polish | Done (Session 6); **mascot later removed** |
 | 5 | CLI entrypoint, Windows Task Scheduler integration | **Done** (Session 8) |
 | 6 | Compact-terminal restructure + recurring-use features | **Done** (current session) |
 
 ### Phase 6 deltas
 
-- Layout went **three-column → two-column 60:40** (table : notice board). The mascot moved off the main screen into a dedicated `MascotScreen` accessed via `m` (Esc returns).
+- Layout went **three-column → two-column 60:40** (table : notice board). (A dedicated `MascotScreen` accessed via `m` was added here and later removed.)
 - New keybindings on the main screen: `k` Kept it (auto-advance + ledger), `h` History, `v` Archive (cancelled subs), `c` Convert column, `t` Totals cycle, `o` Sort cycle.
 - Notice panel window is now adaptive (7–14 days) and its off-state shows a categorized **keybindings tutorial** instead of going blank.
 - New persisted state: `convert_column_enabled`, `convert_currency`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
@@ -188,7 +181,6 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.
 - **Archive view (`v`):** cycles cancelled subs in/out of the visible list, dimmed throughout so they read as for-reference. Title-bar indicator `· +archive`.
 - **Trial expiry:** optional `trial_ends` field on `Subscription`. Notice panel detects trial endings in its window and emits a distinct trial-flavor post (alarmed kaomoji pool: `(((;ﾟДﾟ)))`, `(´；ω；｀)`, etc.; `"trial ends today!"` body) on the expiry day, taking priority over the regular renewal post if both fall on the same day.
-- **Mascot screen (`m`):** `MascotScreen` renders the art using `load_mascot_fit(inner_w, inner_h)` — it measures each tier's *actual* dimensions and picks the largest that fully fits **both** width and height, so the whole figure always shows. (The earlier `load_mascot_by_width` ignored height and cropped the head on wide-but-short windows.) Only if even the smallest tier is too big does it bottom-anchor + crop (feet stay, head clips) as a last resort; when the art fits it's vertically centered. Placement is baked into the art `Text` at build time, so it is rebuilt on every genuine terminal resize: `compose()` builds it once (in `Static`'s constructor, to dodge a Textual pilot-mode crash from `query_one().update()` during early mount) and `on_resize` rebuilds it via `update()` thereafter — safe because that fires only post-mount, and a size-equality guard (`_art_size`) skips the initial Resize and other no-ops.
 - **Notice panel (`n` cycles):**
   - **Notices state (default):** banner + 7-to-14 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Three pools (renewal / trial / empty) picked deterministically by `post_id` hash so the same day always renders identically. Always-JA single-char weekday labels; EN/JA bodies. Adaptive window via `_pick_window(height)`. 60-second `set_interval` tick watches for date rollover.
   - **Tutorial state:** categorized keybindings cheat sheet (Editing / Views & filters / Screens / App) in the same textboard styling. Replaces the textboard rather than blanking the column.
@@ -200,7 +192,7 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 
 ## Layout
 
-Two-column 60:40, mascot off-screen by default:
+Two-column 60:40:
 
 ```
 ┌────────────────────────────────────────┬────────────────────────────────┐
@@ -209,9 +201,8 @@ Two-column 60:40, mascot off-screen by default:
 │                                        │                                │
 │  title bar · filter · rows · notes     │  banner · post 1 … post N     │
 └────────────────────────────────────────┴────────────────────────────────┘
-                          press `m` to view mascot
                           press `h` to view renewal history
                           press `n` to flip notice board ↔ tutorial
 ```
 
-The table is the functional and visual center. The notice board supports it; the mascot is presentation polish on a dedicated screen.
+The table is the functional and visual center. The notice board supports it.

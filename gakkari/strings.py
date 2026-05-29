@@ -37,7 +37,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_quit": "Quit",
         "bind_help": "Help",
         "bind_lang": "Lang",
-        "bind_mascot": "Mascot",
         "bind_filter": "Filter",
         "bind_gross_net": "Gross/Net",
         "bind_paused": "Paused",
@@ -77,10 +76,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "income_unset": "set monthly income in settings (s)",
         # Conversion column (Phase 6)
         "indicator_conv": "conv→{target}",
-        # Mascot screen (Phase 6)
-        "mascot_screen_title": "Mascot",
-        "mascot_screen_hint": "[Esc] to return",
-        "mascot_screen_too_small": "Terminal too small for mascot.",
         # Auto-advance (Phase 6)
         "advance_notify": "{name}: {old} → {new}",
         # History screen (Phase 6)
@@ -128,7 +123,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "Exported {count} subscription(s) to {path}",
         # Misc UI
         "title_shortcuts": "Keyboard shortcuts",
-        "help_text": "a Add · e Edit · d Delete · k Kept it · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · L Lang · m Mascot · n Notices · q Quit",
+        "help_text": "a Add · e Edit · d Delete · k Kept it · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · L Lang · n Notices · q Quit",
         "no_subs": "No subscriptions. Press [a] to add one.",
         "due_soon": "▲ DUE SOON",
         "no_notes": "no notes",
@@ -212,7 +207,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_quit": "終了",
         "bind_help": "ヘルプ",
         "bind_lang": "言語",
-        "bind_mascot": "娘",
         "bind_filter": "絞り込み",
         "bind_gross_net": "税込/税抜",
         "bind_paused": "停止中",
@@ -252,10 +246,6 @@ _STRINGS: dict[str, dict[str, str]] = {
         "income_unset": "設定で月収を入力してください",
         # Conversion column (Phase 6)
         "indicator_conv": "換算→{target}",
-        # Mascot screen (Phase 6)
-        "mascot_screen_title": "OL娘",
-        "mascot_screen_hint": "[Esc] で戻る",
-        "mascot_screen_too_small": "画面が小さすぎます。",
         # Auto-advance (Phase 6)
         "advance_notify": "{name}：{old} → {new}",
         # History screen (Phase 6)
@@ -303,7 +293,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "{count}件を {path} に書き出しました",
         # Misc UI
         "title_shortcuts": "キーボードショートカット",
-        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · L 言語 · m 娘 · n 通知 · q 終了",
+        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · L 言語 · n 通知 · q 終了",
         "no_subs": "サブスクなし。[a] で追加。",
         "due_soon": "▲ 期限近",
         "no_notes": "メモなし",

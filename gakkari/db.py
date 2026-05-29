@@ -55,7 +55,6 @@ CREATE TABLE IF NOT EXISTS settings (
     due_soon_days          INTEGER NOT NULL DEFAULT 7,
     monthly_income         DECIMAL NOT NULL DEFAULT '0',
     monthly_income_currency TEXT   NOT NULL DEFAULT '',
-    mascot_enabled         INTEGER NOT NULL DEFAULT 1,
     notices_enabled        INTEGER NOT NULL DEFAULT 1,
     language               TEXT    NOT NULL DEFAULT 'en',
     convert_column_enabled INTEGER NOT NULL DEFAULT 0,
@@ -195,7 +194,6 @@ def load_settings(conn: sqlite3.Connection) -> Settings:
         due_soon_days=row["due_soon_days"],
         monthly_income=row["monthly_income"],
         monthly_income_currency=row["monthly_income_currency"],
-        mascot_enabled=bool(row["mascot_enabled"]),
         notices_enabled=bool(row["notices_enabled"]),
         language=row["language"],
         convert_column_enabled=bool(row["convert_column_enabled"]),
@@ -210,13 +208,13 @@ def save_settings(conn: sqlite3.Connection, s: Settings) -> None:
         """UPDATE settings SET
            base_currency=?, price_display_mode=?, due_soon_days=?,
            monthly_income=?, monthly_income_currency=?,
-           mascot_enabled=?, notices_enabled=?, language=?,
+           notices_enabled=?, language=?,
            convert_column_enabled=?, convert_currency=?,
            totals_view_mode=?, sort_mode=?
            WHERE id=1""",
         (s.base_currency, s.price_display_mode, s.due_soon_days,
          s.monthly_income, s.monthly_income_currency,
-         int(s.mascot_enabled), int(s.notices_enabled),
+         int(s.notices_enabled),
          s.language, int(s.convert_column_enabled), s.convert_currency,
          s.totals_view_mode, s.sort_mode),
     )

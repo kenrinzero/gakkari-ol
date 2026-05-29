@@ -40,9 +40,6 @@ Issues = "https://github.com/kenrinzero/gakkari-ol/issues"
 where = ["."]
 include = ["gakkari*"]
 
-[tool.setuptools.package-data]
-gakkari = ["assets/*.txt"]
-
 [build-system]
 requires = ["setuptools>=70"]
 build-backend = "setuptools.build_meta"

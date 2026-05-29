@@ -37,7 +37,6 @@ from gakkari.ui.confirm_modal import ConfirmModal
 from gakkari.ui.export_modal import ExportModal
 from gakkari.ui.history_screen import HistoryScreen
 from gakkari.ui.import_modal import ImportModal
-from gakkari.ui.mascot_screen import MascotScreen
 from gakkari.ui.notice_panel import NoticePanel
 from gakkari.ui.settings_modal import SettingsModal
 from gakkari.ui.subscription_modal import SubscriptionModal
@@ -93,7 +92,6 @@ class MainScreen(Screen):
         Binding("x", "export", "Export"),
         Binding("i", "import_subs", "Import"),
         Binding("l", "toggle_language", "Lang"),
-        Binding("m", "toggle_mascot", "Mascot"),
         Binding("n", "toggle_notices", "Notices"),
         Binding("h", "open_history", "History"),
         Binding("q", "quit", "Quit"),
@@ -270,7 +268,7 @@ class MainScreen(Screen):
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if self._notes_active and action in (
-            "add", "edit", "delete", "open_notes", "help", "toggle_mascot",
+            "add", "edit", "delete", "open_notes", "help",
             "toggle_notices", "focus_filter", "toggle_gross_net",
             "toggle_paused", "settings", "export", "import_subs",
             "cycle_sort", "cycle_totals", "toggle_convert", "advance_renewal",
@@ -909,12 +907,6 @@ class MainScreen(Screen):
                 timeout=6,
             )
 
-    # ── Mascot screen ───────────────────────────────────────────────────
-
-    def action_toggle_mascot(self) -> None:
-        # `m` opens the dedicated mascot screen; Esc inside returns.
-        self.app.push_screen(MascotScreen(lang=self._lang))
-
     # ── History screen ──────────────────────────────────────────────────
 
     def action_open_history(self) -> None:
@@ -943,8 +935,8 @@ class MainScreen(Screen):
             panel = self.query_one("#right-panel", NoticePanel)
         except Exception:
             return
-        # Derive inner width from the terminal size (matches mascot reasoning:
-        # widget.content_size lags during resize transitions).
+        # Derive inner width from the terminal size (widget.content_size
+        # lags during resize transitions).
         term = self.app.size
         # 40% column minus 2 cols of border minus 2 cols of horizontal padding.
         width = max(20, int(term.width * 0.40) - 4)

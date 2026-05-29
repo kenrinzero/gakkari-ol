@@ -112,7 +112,6 @@ class NoticePanel(Static):
                 ("c", "bind_convert"),
             )),
             ("tutorial_section_screens", (
-                ("m", "bind_mascot"),
                 ("h", "bind_history"),
                 ("n", "bind_notices"),
             )),
