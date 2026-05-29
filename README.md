@@ -86,6 +86,7 @@ Built collaboratively with several AI models. Each contributed a distinct stage 
 - **Claude Sonnet 4.7** — initial scaffold and visual style
 - **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board, mascot)
 - **Claude Opus 4.7** — Phases 5–6: CLI entry point, two-column restructure, mascot + history screens, auto-advance + renewal ledger, archive view, trial-expiry warnings, sort/totals/convert cycles, adaptive notice window, tutorial alt-state
+- **Claude Opus 4.8** — mascot resize fix, convert-column currency decoupled from base (+ Settings-save reset bugfix), income totals mode
 
 ## License
 
