@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
@@ -78,6 +80,11 @@ class SettingsModal(ModalScreen[Settings | None]):
             yield Label(t("settings_base_currency", lang), classes="field-label")
             yield Input(value=self._settings.base_currency, id="base_currency")
 
+            yield Label(t("settings_convert_currency", lang), classes="field-label")
+            yield Input(
+                value=self._settings.convert_currency, id="convert_currency"
+            )
+
             yield Label(t("settings_display_mode", lang), classes="field-label")
             yield Select(
                 mode_options,
@@ -110,6 +117,16 @@ class SettingsModal(ModalScreen[Settings | None]):
         if len(currency) != 3 or not currency.isalpha():
             errors.append(t("err_currency_invalid", lang))
 
+        # Blank convert currency means "follow base"; otherwise it must be a
+        # 3-letter code just like the base currency.
+        convert_currency = (
+            self.query_one("#convert_currency", Input).value.strip().upper()
+        )
+        if convert_currency and (
+            len(convert_currency) != 3 or not convert_currency.isalpha()
+        ):
+            errors.append(t("err_convert_currency_invalid", lang))
+
         mode = self.query_one("#display_mode", Select).value
         if mode is Select.BLANK:
             mode = self._settings.price_display_mode
@@ -132,13 +149,15 @@ class SettingsModal(ModalScreen[Settings | None]):
             )
             return
 
-        out = Settings(
-            id=self._settings.id,
+        # replace() carries over every field this modal doesn't edit
+        # (mascot/notices/language and the view-state fields convert_column_
+        # enabled / totals_view_mode / sort_mode), which a fresh Settings(...)
+        # would silently reset to defaults.
+        out = replace(
+            self._settings,
             base_currency=currency,
+            convert_currency=convert_currency,
             price_display_mode=mode,
             due_soon_days=days,
-            mascot_enabled=self._settings.mascot_enabled,
-            notices_enabled=self._settings.notices_enabled,
-            language=self._settings.language,
         )
         self.dismiss(out)

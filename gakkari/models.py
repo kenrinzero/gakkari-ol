@@ -117,6 +117,7 @@ class Settings:
     notices_enabled: bool = True
     language: str = "en"
     convert_column_enabled: bool = False
+    convert_currency: str = ""  # `c` column target; blank → follow base_currency
     totals_view_mode: str = "estimate"
     sort_mode: str = "date"
     id: int | None = None

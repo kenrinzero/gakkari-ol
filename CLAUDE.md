@@ -100,6 +100,7 @@ Settings (singleton, id=1):
   mascot_enabled (bool), notices_enabled (bool),
   language,                                     # "en" | "ja"
   convert_column_enabled (bool),                # `c` row-level conversion column
+  convert_currency,                             # `c` column target; blank → follow base_currency
   totals_view_mode,                             # estimate | monthly_strict | yearly_strict | by_period
   sort_mode                                     # date | period | name | amount
 
@@ -168,7 +169,8 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - Layout went **three-column → two-column 60:40** (table : notice board). The mascot moved off the main screen into a dedicated `MascotScreen` accessed via `m` (Esc returns).
 - New keybindings on the main screen: `k` Kept it (auto-advance + ledger), `h` History, `v` Archive (cancelled subs), `c` Convert column, `t` Totals cycle, `o` Sort cycle.
 - Notice panel window is now adaptive (7–14 days) and its off-state shows a categorized **keybindings tutorial** instead of going blank.
-- New persisted state: `convert_column_enabled`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
+- New persisted state: `convert_column_enabled`, `convert_currency`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
+- `SettingsModal._save()` rebuilds the `Settings` object via `dataclasses.replace(self._settings, …)`, editing only the fields the modal exposes. It must never construct a bare `Settings(...)` — the view-state fields (`convert_column_enabled`, `convert_currency`, `totals_view_mode`, `sort_mode`) live only in `self._settings`, and a fresh constructor would silently reset them to defaults on every Save.
 - DB-IO failure handling was tightened — bare `except Exception: pass` swallows around settings load/save and history load now surface as `notify(..., severity="warning")`.
 
 ### Current state (after Phase 6)
@@ -178,7 +180,7 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **Full CRUD:** `SubscriptionModal`, `ConfirmModal` (soft-delete via `status = "cancelled"`). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
 - **Sort cycle (`o`):** date → period → name → amount. Sort happens in-memory in `_refresh_view` after filtering; sort by amount uses the rate cache so cross-currency comparisons are meaningful. Indicator `· sort:<mode>` shown when not default.
 - **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`).
-- **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. Rows where the sub currency equals `base_currency` show `—` in place of the conversion. Toggle indicator `· conv→<base>` in the title bar.
+- **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. The conversion target is **`convert_currency`** if set, else `base_currency` — it is decoupled from the base so totals can stay in one currency (e.g. EUR at the top) while the column converts to another (e.g. JPY). Set the target in the Settings modal (blank = follow base). Rows where the sub currency equals the *target* show `—` in place of the conversion. Toggle indicator `· conv→<target>` in the title bar. Rates to the target are fetched into a second cache (`_conv_rates`) alongside the base cache in `_build_rate_cache`, still one lookup per unique currency per refresh.
 - **Auto-advance (`k`):** advances the highlighted sub's `next_renewal_date` by one billing cycle (`Subscription.next_renewal_after`, with month-end clamping via `_add_months` and leap-year safety) AND writes a `renewal_log` row at the *old* date. Toast confirms `name: old → new`.
 - **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.
 - **Archive view (`v`):** cycles cancelled subs in/out of the visible list, dimmed throughout so they read as for-reference. Title-bar indicator `· +archive`.

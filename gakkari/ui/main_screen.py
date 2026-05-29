@@ -211,6 +211,10 @@ class MainScreen(Screen):
         self._show_cancelled: bool = False
         self._fallback_currencies: set[str] = set()
         self._rate_cache: dict[str, Decimal] = {}
+        # Rates keyed to the convert-column target (see _convert_target). Kept
+        # separate from _rate_cache because the `c` column can target a
+        # different currency than the base used for totals/sort.
+        self._conv_rates: dict[str, Decimal] = {}
         self._last_seen_date: date = date.today()
 
     def compose(self) -> ComposeResult:
@@ -308,19 +312,40 @@ class MainScreen(Screen):
         self._rebuild_list()
         self._update_title()
 
+    def _convert_target(self) -> str:
+        """Currency the `c` column converts into. Blank setting → base."""
+        return self._settings.convert_currency or self._settings.base_currency
+
     def _build_rate_cache(self, subs: list[Subscription]) -> dict[str, Decimal]:
         base = self._settings.base_currency
+        target = self._convert_target()
+        # The convert column only needs a second target when it's on AND that
+        # target differs from base; otherwise it reads the base cache.
+        want_conv = self._settings.convert_column_enabled and target != base
         rates: dict[str, Decimal] = {base: Decimal("1")}
-        needed = {s.currency for s in subs if s.currency and s.currency != base}
+        conv: dict[str, Decimal] = {target: Decimal("1")}
+        base_needed = {s.currency for s in subs if s.currency and s.currency != base}
+        conv_needed = (
+            {s.currency for s in subs if s.currency and s.currency != target}
+            if want_conv else set()
+        )
         fallback: set[str] = set()
-        if needed:
+        if base_needed or conv_needed:
             with get_conn() as conn:
-                for cur in needed:
+                for cur in base_needed:
                     r = get_rate(conn, cur, base)
                     if r == Decimal("1") and cur != base:
                         fallback.add(cur)
                     rates[cur] = r
+                for cur in conv_needed:
+                    r = get_rate(conn, cur, target)
+                    if r == Decimal("1") and cur != target:
+                        fallback.add(cur)
+                    conv[cur] = r
         self._fallback_currencies = fallback
+        # When the target is base, the base cache already has every rate the
+        # column needs — point at it rather than keep a duplicate.
+        self._conv_rates = conv if want_conv else rates
         return rates
 
     def _sort_subs(self, subs: list[Subscription]) -> list[Subscription]:
@@ -385,7 +410,9 @@ class MainScreen(Screen):
             sort_label = t(f"sort_{self._settings.sort_mode}", lang)
             indicators += f" · {t('indicator_sort', lang).format(mode=sort_label)}"
         if self._settings.convert_column_enabled:
-            indicators += f" · {t('indicator_conv', lang).format(base=base)}"
+            indicators += (
+                f" · {t('indicator_conv', lang).format(target=self._convert_target())}"
+            )
         if not self._subs:
             self._fallback_currencies = set()
             title.update(f"がっかりOL{indicators}")
@@ -476,7 +503,6 @@ class MainScreen(Screen):
         w = self._line_width()
         today = date.today()
         mode = self._settings.price_display_mode
-        base = self._settings.base_currency
         due_threshold = self._settings.due_soon_days
         text = Text()
 
@@ -485,12 +511,13 @@ class MainScreen(Screen):
         notes_dot = " ●" if sub.notes else " ◌"
         conv_str = ""
         if self._settings.convert_column_enabled:
-            if sub.currency == base:
+            target = self._convert_target()
+            if sub.currency == target:
                 conv_str = "  —"
             else:
-                rate = self._rate_cache.get(sub.currency, Decimal("1"))
+                rate = self._conv_rates.get(sub.currency, Decimal("1"))
                 conv = sub.display_amount(mode) * rate
-                conv_str = f"  ≈ {conv:,.2f} {base}"
+                conv_str = f"  ≈ {conv:,.2f} {target}"
         right1 = amount_str + conv_str + notes_dot
         pad1 = max(1, w - _disp_width(name) - _disp_width(right1))
         text.append(name, style="bold #FF8C00")
