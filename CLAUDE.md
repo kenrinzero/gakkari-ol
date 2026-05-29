@@ -27,6 +27,12 @@ textual console
 TEXTUAL_LOG=1 python -m gakkari
 ```
 
+### Versioning & updating
+
+The version lives in **three places that must stay in sync** — `pyproject.toml`, `gakkari/__init__.py` (`__version__`), and the landing-page boot line in `docs/index.html` (`ver X.Y.Z`). **Bump all three on every release that changes behavior.**
+
+Why it matters: pip identifies a package by `(name, version)`, so `pip install [--upgrade] git+https://github.com/kenrinzero/gakkari-ol` against an environment that already has that version **no-ops as "Requirement already satisfied"** — the new code never installs. This bit the 0.1.0→0.2.0 update, and again the mascot removal (which shipped without a bump, so installs kept showing the mascot). Keep the version moving and updates resolve cleanly. Escape hatch to force an update regardless of version: `pip install --force-reinstall git+…`.
+
 ---
 
 ## Project layout
