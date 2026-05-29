@@ -56,8 +56,8 @@ The SQLite database is created on first launch at `data/gakkari.db` inside the p
 - **Adaptive notice board** — Japanese textboard styling with a rolling 1-to-2-week window that expands as your terminal gets taller. Deterministic kaomoji per day, EN/JA bilingual. Press `n` to flip between notices and a categorized keybindings tutorial.
 - **Trial expiry warnings** — optional `trial_ends` per sub; the notice board surfaces an alarmed-kaomoji post on the day a trial converts to paid.
 - **Multi-currency totals** — exchange rates fetched daily from [frankfurter.app](https://www.frankfurter.app/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.
-- **Sort (`o`) and totals (`t`) cycles** — sort by date / period / name / amount; totals as monthly+yearly estimate, strict-monthly, strict-yearly, or per-period breakdown.
-- **Conversion column (`c`)** — show each row's amount in your base currency next to its native price, so you stop doing mental currency math.
+- **Sort (`o`) and totals (`t`) cycles** — sort by date / period / name / amount; totals as monthly+yearly estimate, strict-monthly, strict-yearly, per-period breakdown, or income (amortized spend vs. your monthly income).
+- **Conversion column (`c`)** — show each row's amount converted to your base (or any chosen) currency next to its native price, so you stop doing mental currency math.
 - **Gross / net VAT display mode**, per-row tax mode and rate.
 - **CSV and JSON import / export.**
 - **One-shot `--notice` CLI** for daily routines (Windows Task Scheduler, cron, login scripts).
