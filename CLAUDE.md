@@ -97,9 +97,11 @@ Subscription:
 Settings (singleton, id=1):
   base_currency, price_display_mode,           # "net" | "gross"
   due_soon_days (int),
+  monthly_income (Decimal),                     # in base_currency; 0 = unset (powers the `income` totals mode)
   mascot_enabled (bool), notices_enabled (bool),
   language,                                     # "en" | "ja"
   convert_column_enabled (bool),                # `c` row-level conversion column
+  convert_currency,                             # `c` column target; blank → follow base_currency
   totals_view_mode,                             # estimate | monthly_strict | yearly_strict | by_period
   sort_mode                                     # date | period | name | amount
 
@@ -168,7 +170,8 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - Layout went **three-column → two-column 60:40** (table : notice board). The mascot moved off the main screen into a dedicated `MascotScreen` accessed via `m` (Esc returns).
 - New keybindings on the main screen: `k` Kept it (auto-advance + ledger), `h` History, `v` Archive (cancelled subs), `c` Convert column, `t` Totals cycle, `o` Sort cycle.
 - Notice panel window is now adaptive (7–14 days) and its off-state shows a categorized **keybindings tutorial** instead of going blank.
-- New persisted state: `convert_column_enabled`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
+- New persisted state: `convert_column_enabled`, `convert_currency`, `totals_view_mode`, `sort_mode`, plus the optional `trial_ends` field on `Subscription` and the new `renewal_log` table.
+- `SettingsModal._save()` rebuilds the `Settings` object via `dataclasses.replace(self._settings, …)`, editing only the fields the modal exposes. It must never construct a bare `Settings(...)` — the view-state fields (`convert_column_enabled`, `convert_currency`, `totals_view_mode`, `sort_mode`) live only in `self._settings`, and a fresh constructor would silently reset them to defaults on every Save.
 - DB-IO failure handling was tightened — bare `except Exception: pass` swallows around settings load/save and history load now surface as `notify(..., severity="warning")`.
 
 ### Current state (after Phase 6)
@@ -177,13 +180,14 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **`MainScreen` layout:** two-column. Left 60% = `#center-panel` (title bar with mode/paused/sort/conv/cancelled indicators → filter `Input` → `ContentSwitcher` between `OptionList` and notes `TextArea`). Right 40% = `#right-panel` (NoticePanel).
 - **Full CRUD:** `SubscriptionModal`, `ConfirmModal` (soft-delete via `status = "cancelled"`). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
 - **Sort cycle (`o`):** date → period → name → amount. Sort happens in-memory in `_refresh_view` after filtering; sort by amount uses the rate cache so cross-currency comparisons are meaningful. Indicator `· sort:<mode>` shown when not default.
-- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`).
-- **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. Rows where the sub currency equals `base_currency` show `—` in place of the conversion. Toggle indicator `· conv→<base>` in the title bar.
+- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`) → income.
+- **Income totals mode:** `income · committed · left (n%)` in `base_currency`. "committed" is the **amortized** monthly figure (`_total_monthly_in_base`, same as `estimate` — yearly/quarterly subs folded to their /12 share) so "left" doesn't lurch in months with an annual renewal. Over budget shows `… over (n%)` instead of `left`. With `monthly_income == 0` (unset) it shows the committed figure plus a "set monthly income in settings" nudge rather than implying the whole income is free. Income is set in the Settings modal (blank = unset), stored as `Decimal` in base currency. This is the shippable step 1; a richer left-press budget panel is a possible later addition.
+- **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. The conversion target is **`convert_currency`** if set, else `base_currency` — it is decoupled from the base so totals can stay in one currency (e.g. EUR at the top) while the column converts to another (e.g. JPY). Set the target in the Settings modal (blank = follow base). Rows where the sub currency equals the *target* show `—` in place of the conversion. Toggle indicator `· conv→<target>` in the title bar. Rates to the target are fetched into a second cache (`_conv_rates`) alongside the base cache in `_build_rate_cache`, still one lookup per unique currency per refresh.
 - **Auto-advance (`k`):** advances the highlighted sub's `next_renewal_date` by one billing cycle (`Subscription.next_renewal_after`, with month-end clamping via `_add_months` and leap-year safety) AND writes a `renewal_log` row at the *old* date. Toast confirms `name: old → new`.
 - **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.
 - **Archive view (`v`):** cycles cancelled subs in/out of the visible list, dimmed throughout so they read as for-reference. Title-bar indicator `· +archive`.
 - **Trial expiry:** optional `trial_ends` field on `Subscription`. Notice panel detects trial endings in its window and emits a distinct trial-flavor post (alarmed kaomoji pool: `(((;ﾟДﾟ)))`, `(´；ω；｀)`, etc.; `"trial ends today!"` body) on the expiry day, taking priority over the regular renewal post if both fall on the same day.
-- **Mascot screen (`m`):** `MascotScreen` renders the art using `load_mascot_by_width` (width-only tier pick — full screen has no narrow column to starve into the smallest tier). Vertical centering when art fits, bottom-anchored crop when it doesn't (head clips off, feet stay). Art is built into `Static`'s constructor inside `compose()` to avoid a Textual pilot-mode crash that surfaced when art was set via `query_one().update()` from `on_mount`.
+- **Mascot screen (`m`):** `MascotScreen` renders the art using `load_mascot_by_width` (width-only tier pick — full screen has no narrow column to starve into the smallest tier). Vertical centering when art fits, bottom-anchored crop when it doesn't (head clips off, feet stay). Placement is baked into the art `Text` at build time, so it is rebuilt on every genuine terminal resize: `compose()` builds it once (in `Static`'s constructor, to dodge a Textual pilot-mode crash from `query_one().update()` during early mount) and `on_resize` rebuilds it via `update()` thereafter — safe because that fires only post-mount, and a size-equality guard (`_art_size`) skips the initial Resize and other no-ops. Without this the art stayed frozen at its open-time size: growing the window after opening left the figure pinned to the top with a tall gap below it.
 - **Notice panel (`n` cycles):**
   - **Notices state (default):** banner + 7-to-14 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Three pools (renewal / trial / empty) picked deterministically by `post_id` hash so the same day always renders identically. Always-JA single-char weekday labels; EN/JA bodies. Adaptive window via `_pick_window(height)`. 60-second `set_interval` tick watches for date rollover.
   - **Tutorial state:** categorized keybindings cheat sheet (Editing / Views & filters / Screens / App) in the same textboard styling. Replaces the textboard rather than blanking the column.

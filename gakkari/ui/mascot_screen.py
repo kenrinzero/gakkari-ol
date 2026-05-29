@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rich.text import Text
+from textual import events
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
@@ -14,9 +15,12 @@ from gakkari.strings import t
 class MascotScreen(Screen):
     """Full-screen mascot view. `m` from MainScreen opens it; Esc returns.
 
-    The art is composed once at mount time using the current terminal size.
-    Live resize is intentionally not supported here — re-open the screen if
-    the window changed.
+    Vertical placement (center when the art fits, head-clip/feet-anchor when
+    it doesn't) is baked into the art ``Text`` at build time, so it has to be
+    rebuilt whenever the terminal size changes. ``compose`` builds it once for
+    the initial size and ``on_resize`` rebuilds it on every genuine change —
+    otherwise a window grown after opening would leave the art pinned to the
+    top with a tall gap below it.
     """
 
     BINDINGS = [
@@ -64,9 +68,14 @@ class MascotScreen(Screen):
     def __init__(self, lang: str = "en") -> None:
         super().__init__()
         self._lang = lang
+        # Terminal size the current art Text was built for; on_resize compares
+        # against it to skip redundant rebuilds (incl. the initial Resize that
+        # fires right after mount with the same size compose already used).
+        self._art_size: tuple[int, int] = (0, 0)
 
     def compose(self) -> ComposeResult:
         art_content = self._compose_art()
+        self._art_size = (self.app.size.width, self.app.size.height)
         hint_text = (
             f"{t('mascot_screen_title', self._lang)} - "
             f"{t('mascot_screen_hint', self._lang)}"
@@ -75,6 +84,16 @@ class MascotScreen(Screen):
             yield Static(art_content, id="mascot-art")
             yield Static(hint_text, id="mascot-hint", markup=False)
         yield Footer()
+
+    def on_resize(self, event: events.Resize) -> None:
+        size = (self.app.size.width, self.app.size.height)
+        if size == self._art_size:
+            return
+        self._art_size = size
+        # Rebuilding via update() (rather than at construction) is safe here:
+        # on_resize only fires once the screen is mounted and laid out, well
+        # past the early-mount window where update() tripped a pilot crash.
+        self.query_one("#mascot-art", Static).update(self._compose_art())
 
     def _compose_art(self) -> Text:
         # Width-only tier pick: the dedicated screen has the whole terminal,

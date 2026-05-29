@@ -69,8 +69,14 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "monthly only",
         "totals_mode_yearly_strict": "yearly only",
         "totals_mode_by_period": "by period",
+        # Income totals mode (amortized monthly vs income)
+        "income_label": "income",
+        "income_committed": "committed",
+        "income_left": "left",
+        "income_over": "over",
+        "income_unset": "set monthly income in settings (s)",
         # Conversion column (Phase 6)
-        "indicator_conv": "conv→{base}",
+        "indicator_conv": "conv→{target}",
         # Mascot screen (Phase 6)
         "mascot_screen_title": "Mascot",
         "mascot_screen_hint": "[Esc] to return",
@@ -104,8 +110,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         # Settings modal
         "settings_title": "Settings",
         "settings_base_currency": "Base currency",
+        "settings_convert_currency": "Convert-to currency (blank = base)",
         "settings_display_mode": "Price display",
         "settings_due_soon_days": "Due-soon threshold (days)",
+        "settings_monthly_income": "Monthly income (base currency, blank = none)",
         # Export modal
         "export_title": "Export subscriptions",
         "export_format": "Format",
@@ -147,6 +155,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "err_amount_invalid": "Amount must be a valid number (e.g. 9.99).",
         "err_amount_negative": "Amount must be non-negative.",
         "err_currency_invalid": "Currency must be a 3-letter code (e.g. USD).",
+        "err_convert_currency_invalid": "Convert-to currency must be a 3-letter code or blank.",
         "err_date_invalid": "Date must be YYYY-MM-DD format.",
         "err_tax_rate_invalid": "Tax rate must be a valid number.",
         "err_fix_before_save": "Fix before saving",
@@ -233,8 +242,14 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "月次のみ",
         "totals_mode_yearly_strict": "年次のみ",
         "totals_mode_by_period": "周期別",
+        # Income totals mode (amortized monthly vs income)
+        "income_label": "収入",
+        "income_committed": "支出",
+        "income_left": "残り",
+        "income_over": "超過",
+        "income_unset": "設定で月収を入力してください",
         # Conversion column (Phase 6)
-        "indicator_conv": "換算→{base}",
+        "indicator_conv": "換算→{target}",
         # Mascot screen (Phase 6)
         "mascot_screen_title": "OL娘",
         "mascot_screen_hint": "[Esc] で戻る",
@@ -268,8 +283,10 @@ _STRINGS: dict[str, dict[str, str]] = {
         # Settings modal
         "settings_title": "設定",
         "settings_base_currency": "基準通貨",
+        "settings_convert_currency": "換算先通貨（空欄で基準と同じ）",
         "settings_display_mode": "表示モード",
         "settings_due_soon_days": "期限近通知（日数）",
+        "settings_monthly_income": "月収（基準通貨、空欄でなし）",
         # Export modal
         "export_title": "サブスクを書き出す",
         "export_format": "形式",
@@ -311,6 +328,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "err_amount_invalid": "金額は有効な数値で入力してください。",
         "err_amount_negative": "金額は0以上にしてください。",
         "err_currency_invalid": "通貨は3文字のコードで入力してください。",
+        "err_convert_currency_invalid": "換算先通貨は3文字のコードか空欄で入力してください。",
         "err_date_invalid": "更新日はYYYY-MM-DD形式で入力してください。",
         "err_tax_rate_invalid": "税率は有効な数値で入力してください。",
         "err_fix_before_save": "保存前に修正",
