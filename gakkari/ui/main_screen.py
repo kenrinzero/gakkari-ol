@@ -317,6 +317,10 @@ class MainScreen(Screen):
         """Currency the `c` column converts into. Blank setting → base."""
         return self._settings.convert_currency or self._settings.base_currency
 
+    def _income_target(self) -> str:
+        """Currency monthly income is held in. Blank setting → base."""
+        return self._settings.monthly_income_currency or self._settings.base_currency
+
     def _build_rate_cache(self, subs: list[Subscription]) -> dict[str, Decimal]:
         base = self._settings.base_currency
         target = self._convert_target()
@@ -326,6 +330,15 @@ class MainScreen(Screen):
         rates: dict[str, Decimal] = {base: Decimal("1")}
         conv: dict[str, Decimal] = {target: Decimal("1")}
         base_needed = {s.currency for s in subs if s.currency and s.currency != base}
+        # Income mode converts the income into base, so its currency needs a
+        # rate in the base cache too.
+        income_ccy = self._income_target()
+        if (
+            self._settings.totals_view_mode == "income"
+            and self._settings.monthly_income > 0
+            and income_ccy != base
+        ):
+            base_needed.add(income_ccy)
         conv_needed = (
             {s.currency for s in subs if s.currency and s.currency != target}
             if want_conv else set()
@@ -464,13 +477,14 @@ class MainScreen(Screen):
     def _format_income(
         self, subs: list[Subscription], base: str, lang: str
     ) -> str:
-        """Amortized monthly commitment vs. monthly income, both in base.
+        """Amortized monthly commitment vs. monthly income.
 
-        Uses the same normalized monthly figure as the `estimate` mode so a
-        month with an annual renewal doesn't make "left" lurch — yearly subs
-        are folded to their /12 share. Income of 0 means unset: show the
-        committed figure plus a nudge to set income rather than a scary
-        "everything is remaining" reading.
+        "committed" is the normalized monthly figure (same basis as the
+        `estimate` mode — yearly/quarterly subs folded to their /12 share) so
+        "left" doesn't lurch in a month with an annual renewal. Income may be
+        held in its own currency (``monthly_income_currency``); it is converted
+        into base for the comparison, since base is the currency subs are paid
+        in. Income of 0 means unset: show committed plus a nudge to set it.
         """
         income = self._settings.monthly_income
         committed = self._total_monthly_in_base(subs)
@@ -479,11 +493,20 @@ class MainScreen(Screen):
                 f"{base} {committed:,.2f} {t('income_committed', lang)} · "
                 f"{t('income_unset', lang)}"
             )
-        remaining = income - committed
-        pct = committed / income * 100
+        income_ccy = self._income_target()
+        income_base = income * self._rate_cache.get(income_ccy, Decimal("1"))
+        remaining = income_base - committed
+        pct = committed / income_base * 100 if income_base else Decimal("0")
         tail = t("income_left", lang) if remaining >= 0 else t("income_over", lang)
+        if income_ccy == base:
+            income_part = f"{base} {income:,.2f} {t('income_label', lang)}"
+        else:
+            income_part = (
+                f"{income_ccy} {income:,.2f} {t('income_label', lang)} "
+                f"(≈ {base} {income_base:,.2f})"
+            )
         return (
-            f"{base} {income:,.2f} {t('income_label', lang)} · "
+            f"{income_part} · "
             f"{base} {committed:,.2f} {t('income_committed', lang)} · "
             f"{base} {abs(remaining):,.2f} {tail} ({pct:.0f}%)"
         )

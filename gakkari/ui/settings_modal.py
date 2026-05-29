@@ -104,6 +104,11 @@ class SettingsModal(ModalScreen[Settings | None]):
                 id="monthly_income",
             )
 
+            yield Label(t("settings_income_currency", lang), classes="field-label")
+            yield Input(
+                value=self._settings.monthly_income_currency, id="income_currency"
+            )
+
             with Horizontal(id="button-row"):
                 yield Button(t("modal_save", lang), id="save", variant="primary")
                 yield Button(t("modal_cancel", lang), id="cancel")
@@ -161,6 +166,15 @@ class SettingsModal(ModalScreen[Settings | None]):
             except (InvalidOperation, ValueError):
                 errors.append(t("err_amount_invalid", lang))
 
+        # Blank income currency means "follow base"; else a 3-letter code.
+        income_currency = (
+            self.query_one("#income_currency", Input).value.strip().upper()
+        )
+        if income_currency and (
+            len(income_currency) != 3 or not income_currency.isalpha()
+        ):
+            errors.append(t("err_income_currency_invalid", lang))
+
         if errors:
             self.notify(
                 "\n".join(errors),
@@ -181,5 +195,6 @@ class SettingsModal(ModalScreen[Settings | None]):
             price_display_mode=mode,
             due_soon_days=days,
             monthly_income=income,
+            monthly_income_currency=income_currency,
         )
         self.dismiss(out)
