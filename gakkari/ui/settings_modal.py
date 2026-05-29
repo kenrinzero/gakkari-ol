@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from decimal import Decimal, InvalidOperation
 
 from textual.app import ComposeResult
 from textual.binding import Binding
@@ -96,6 +97,13 @@ class SettingsModal(ModalScreen[Settings | None]):
             yield Label(t("settings_due_soon_days", lang), classes="field-label")
             yield Input(value=str(self._settings.due_soon_days), id="due_soon_days")
 
+            yield Label(t("settings_monthly_income", lang), classes="field-label")
+            yield Input(
+                value=("" if self._settings.monthly_income == 0
+                       else str(self._settings.monthly_income)),
+                id="monthly_income",
+            )
+
             with Horizontal(id="button-row"):
                 yield Button(t("modal_save", lang), id="save", variant="primary")
                 yield Button(t("modal_cancel", lang), id="cancel")
@@ -140,6 +148,19 @@ class SettingsModal(ModalScreen[Settings | None]):
             errors.append(t("err_amount_invalid", lang))
             days = None
 
+        # Blank monthly income means "unset" (0 → income mode shows a hint).
+        income_str = self.query_one("#monthly_income", Input).value.strip()
+        income = self._settings.monthly_income
+        if income_str == "":
+            income = Decimal("0")
+        else:
+            try:
+                income = Decimal(income_str)
+                if income < 0:
+                    raise ValueError
+            except (InvalidOperation, ValueError):
+                errors.append(t("err_amount_invalid", lang))
+
         if errors:
             self.notify(
                 "\n".join(errors),
@@ -159,5 +180,6 @@ class SettingsModal(ModalScreen[Settings | None]):
             convert_currency=convert_currency,
             price_display_mode=mode,
             due_soon_days=days,
+            monthly_income=income,
         )
         self.dismiss(out)

@@ -9,7 +9,7 @@ BILLING_PERIODS = ("monthly", "yearly", "quarterly", "weekly", "half_yearly")
 STATUSES = ("active", "paused", "cancelled")
 TAX_MODES = ("none", "inclusive", "exclusive")
 PRICE_DISPLAY_MODES = ("net", "gross")
-TOTALS_VIEW_MODES = ("estimate", "monthly_strict", "yearly_strict", "by_period")
+TOTALS_VIEW_MODES = ("estimate", "monthly_strict", "yearly_strict", "by_period", "income")
 SORT_MODES = ("date", "period", "name", "amount")
 
 _MONTHLY_FACTORS: dict[str, Decimal] = {
@@ -113,6 +113,7 @@ class Settings:
     base_currency: str = "USD"
     price_display_mode: str = "gross"
     due_soon_days: int = 7
+    monthly_income: Decimal = field(default_factory=lambda: Decimal("0"))  # in base_currency; 0 = unset
     mascot_enabled: bool = True
     notices_enabled: bool = True
     language: str = "en"

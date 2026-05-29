@@ -97,6 +97,7 @@ Subscription:
 Settings (singleton, id=1):
   base_currency, price_display_mode,           # "net" | "gross"
   due_soon_days (int),
+  monthly_income (Decimal),                     # in base_currency; 0 = unset (powers the `income` totals mode)
   mascot_enabled (bool), notices_enabled (bool),
   language,                                     # "en" | "ja"
   convert_column_enabled (bool),                # `c` row-level conversion column
@@ -179,7 +180,8 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **`MainScreen` layout:** two-column. Left 60% = `#center-panel` (title bar with mode/paused/sort/conv/cancelled indicators → filter `Input` → `ContentSwitcher` between `OptionList` and notes `TextArea`). Right 40% = `#right-panel` (NoticePanel).
 - **Full CRUD:** `SubscriptionModal`, `ConfirmModal` (soft-delete via `status = "cancelled"`). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
 - **Sort cycle (`o`):** date → period → name → amount. Sort happens in-memory in `_refresh_view` after filtering; sort by amount uses the rate cache so cross-currency comparisons are meaningful. Indicator `· sort:<mode>` shown when not default.
-- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`).
+- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`) → income.
+- **Income totals mode:** `income · committed · left (n%)` in `base_currency`. "committed" is the **amortized** monthly figure (`_total_monthly_in_base`, same as `estimate` — yearly/quarterly subs folded to their /12 share) so "left" doesn't lurch in months with an annual renewal. Over budget shows `… over (n%)` instead of `left`. With `monthly_income == 0` (unset) it shows the committed figure plus a "set monthly income in settings" nudge rather than implying the whole income is free. Income is set in the Settings modal (blank = unset), stored as `Decimal` in base currency. This is the shippable step 1; a richer left-press budget panel is a possible later addition.
 - **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. The conversion target is **`convert_currency`** if set, else `base_currency` — it is decoupled from the base so totals can stay in one currency (e.g. EUR at the top) while the column converts to another (e.g. JPY). Set the target in the Settings modal (blank = follow base). Rows where the sub currency equals the *target* show `—` in place of the conversion. Toggle indicator `· conv→<target>` in the title bar. Rates to the target are fetched into a second cache (`_conv_rates`) alongside the base cache in `_build_rate_cache`, still one lookup per unique currency per refresh.
 - **Auto-advance (`k`):** advances the highlighted sub's `next_renewal_date` by one billing cycle (`Subscription.next_renewal_after`, with month-end clamping via `_add_months` and leap-year safety) AND writes a `renewal_log` row at the *old* date. Toast confirms `name: old → new`.
 - **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.

@@ -58,6 +58,7 @@ _TOTALS_CYCLE: tuple[str, ...] = (
     "monthly_strict",
     "yearly_strict",
     "by_period",
+    "income",
 )
 
 
@@ -450,12 +451,41 @@ class MainScreen(Screen):
                 for p, amt in breakdown
             ]
             return " · ".join(parts)
+        if mode == "income":
+            return self._format_income(subs, base, lang)
         # estimate (default): existing monthly+yearly normalized pair
         monthly = self._total_monthly_in_base(subs)
         yearly = monthly * 12
         return (
             f"{base} {monthly:,.2f}/{t('summary_monthly', lang)} · "
             f"{base} {yearly:,.0f}/{t('summary_yearly', lang)}"
+        )
+
+    def _format_income(
+        self, subs: list[Subscription], base: str, lang: str
+    ) -> str:
+        """Amortized monthly commitment vs. monthly income, both in base.
+
+        Uses the same normalized monthly figure as the `estimate` mode so a
+        month with an annual renewal doesn't make "left" lurch — yearly subs
+        are folded to their /12 share. Income of 0 means unset: show the
+        committed figure plus a nudge to set income rather than a scary
+        "everything is remaining" reading.
+        """
+        income = self._settings.monthly_income
+        committed = self._total_monthly_in_base(subs)
+        if income <= 0:
+            return (
+                f"{base} {committed:,.2f} {t('income_committed', lang)} · "
+                f"{t('income_unset', lang)}"
+            )
+        remaining = income - committed
+        pct = committed / income * 100
+        tail = t("income_left", lang) if remaining >= 0 else t("income_over", lang)
+        return (
+            f"{base} {income:,.2f} {t('income_label', lang)} · "
+            f"{base} {committed:,.2f} {t('income_committed', lang)} · "
+            f"{base} {abs(remaining):,.2f} {tail} ({pct:.0f}%)"
         )
 
     def _total_monthly_in_base(self, subs: list[Subscription]) -> Decimal:

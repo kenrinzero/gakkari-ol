@@ -69,6 +69,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "monthly only",
         "totals_mode_yearly_strict": "yearly only",
         "totals_mode_by_period": "by period",
+        # Income totals mode (amortized monthly vs income)
+        "income_label": "income",
+        "income_committed": "committed",
+        "income_left": "left",
+        "income_over": "over",
+        "income_unset": "set monthly income in settings (s)",
         # Conversion column (Phase 6)
         "indicator_conv": "conv→{target}",
         # Mascot screen (Phase 6)
@@ -107,6 +113,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "settings_convert_currency": "Convert-to currency (blank = base)",
         "settings_display_mode": "Price display",
         "settings_due_soon_days": "Due-soon threshold (days)",
+        "settings_monthly_income": "Monthly income (base currency, blank = none)",
         # Export modal
         "export_title": "Export subscriptions",
         "export_format": "Format",
@@ -235,6 +242,12 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "月次のみ",
         "totals_mode_yearly_strict": "年次のみ",
         "totals_mode_by_period": "周期別",
+        # Income totals mode (amortized monthly vs income)
+        "income_label": "収入",
+        "income_committed": "支出",
+        "income_left": "残り",
+        "income_over": "超過",
+        "income_unset": "設定で月収を入力してください",
         # Conversion column (Phase 6)
         "indicator_conv": "換算→{target}",
         # Mascot screen (Phase 6)
@@ -273,6 +286,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "settings_convert_currency": "換算先通貨（空欄で基準と同じ）",
         "settings_display_mode": "表示モード",
         "settings_due_soon_days": "期限近通知（日数）",
+        "settings_monthly_income": "月収（基準通貨、空欄でなし）",
         # Export modal
         "export_title": "サブスクを書き出す",
         "export_format": "形式",
