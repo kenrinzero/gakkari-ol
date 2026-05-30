@@ -9,6 +9,8 @@ from pathlib import Path
 from gakkari.models import RenewalLog, Settings, Subscription
 
 DB_PATH = Path(__file__).parent.parent / "data" / "gakkari.db"
+BACKUP_DIR = DB_PATH.parent / "backups"
+BACKUP_KEEP = 7  # rotating daily snapshots to retain
 
 
 def _adapt_decimal(d: Decimal) -> str:
@@ -102,7 +104,47 @@ def get_conn():
         conn.close()
 
 
+def backup_db(today: date | None = None) -> Path | None:
+    """Once-per-day rotating snapshot of the DB, kept locally under data/backups/.
+
+    The DB is the user's only copy (no cloud by design), so a bad import, a
+    crash mid-write, or a disk hiccup could otherwise wipe years of history.
+    Uses SQLite's online backup API (not a raw file copy) so the snapshot is
+    consistent even under WAL. Skips if today's snapshot already exists, then
+    prunes to the most recent ``BACKUP_KEEP``. Best-effort: the backup must
+    never itself put the app or data at risk, so any failure is swallowed and
+    startup continues. Returns the snapshot path if one was written, else None.
+    """
+    today = today or date.today()
+    if not DB_PATH.exists():
+        return None  # nothing to back up yet (first run)
+    try:
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        dest = BACKUP_DIR / f"gakkari-{today.isoformat()}.db"
+        if dest.exists():
+            return None  # already snapshotted today
+        src = sqlite3.connect(DB_PATH)
+        try:
+            dst = sqlite3.connect(dest)
+            try:
+                src.backup(dst)
+            finally:
+                dst.close()
+        finally:
+            src.close()
+        # Filenames sort chronologically (ISO date), so drop all but the newest.
+        for old in sorted(BACKUP_DIR.glob("gakkari-*.db"))[:-BACKUP_KEEP]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+        return dest
+    except Exception:
+        return None
+
+
 def init_db() -> None:
+    backup_db()
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         conn.execute("INSERT OR IGNORE INTO settings (id) VALUES (1)")
@@ -260,6 +302,12 @@ def insert_renewal(
         (subscription_id, renewed_on, amount, currency, billing_period),
     )
     return cur.lastrowid
+
+
+def delete_renewal(conn: sqlite3.Connection, log_id: int) -> None:
+    """Remove a single renewal_log row by id. Used only by the same-session
+    undo of the last `k` acknowledgement — the ledger is otherwise append-only."""
+    conn.execute("DELETE FROM renewal_log WHERE id=?", (log_id,))
 
 
 def list_renewals(

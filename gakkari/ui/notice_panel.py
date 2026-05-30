@@ -100,6 +100,7 @@ class NoticePanel(Static):
                 ("e", "bind_edit"),
                 ("d", "bind_delete"),
                 ("k", "bind_advance"),
+                ("u", "bind_undo"),
                 ("→", "bind_notes"),
             )),
             ("tutorial_section_views", (

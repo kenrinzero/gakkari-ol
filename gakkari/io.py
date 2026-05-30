@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
-from gakkari.models import Subscription
+from gakkari.models import BILLING_PERIODS, STATUSES, TAX_MODES, Subscription
 
 _FIELDS = (
     "name", "amount", "currency", "billing_period", "next_renewal_date",
@@ -33,18 +33,46 @@ def _sub_to_row(sub: Subscription) -> dict[str, str]:
 def _row_to_sub(row: dict) -> Subscription:
     raw_trial = (row.get("trial_ends") or "").strip() if row.get("trial_ends") else ""
     trial_ends = date.fromisoformat(raw_trial) if raw_trial else None
+
+    # Validate enum/domain fields up front — Decimal/date parse errors are
+    # caught by the callers, but a typo'd status/period/tax_mode would
+    # otherwise import silently and (e.g.) make a row permanently invisible.
+    name = str(row["name"]).strip()
+    if not name:
+        raise ValueError("name: must not be empty")
+    currency = str(row["currency"]).strip().upper()
+    if len(currency) != 3 or not currency.isalpha():
+        raise ValueError(f"currency: {currency!r} must be a 3-letter code")
+    billing_period = str(row["billing_period"]).strip()
+    if billing_period not in BILLING_PERIODS:
+        raise ValueError(
+            f"billing_period: {billing_period!r} not one of {', '.join(BILLING_PERIODS)}"
+        )
+    tax_mode = str(row.get("tax_mode") or "none").strip()
+    if tax_mode not in TAX_MODES:
+        raise ValueError(f"tax_mode: {tax_mode!r} not one of {', '.join(TAX_MODES)}")
+    status = str(row.get("status") or "active").strip()
+    if status not in STATUSES:
+        raise ValueError(f"status: {status!r} not one of {', '.join(STATUSES)}")
+    amount = Decimal(str(row["amount"]))
+    if amount < 0:
+        raise ValueError("amount: must be non-negative")
+    tax_rate = Decimal(str(row.get("tax_rate") or "0"))
+    if tax_rate < 0:
+        raise ValueError("tax_rate: must be non-negative")
+
     return Subscription(
         id=None,
-        name=str(row["name"]),
-        amount=Decimal(str(row["amount"])),
-        currency=str(row["currency"]),
-        billing_period=str(row["billing_period"]),
+        name=name,
+        amount=amount,
+        currency=currency,
+        billing_period=billing_period,
         next_renewal_date=date.fromisoformat(str(row["next_renewal_date"])),
         category=str(row.get("category") or ""),
         notes=str(row.get("notes") or ""),
-        tax_mode=str(row.get("tax_mode") or "none"),
-        tax_rate=Decimal(str(row.get("tax_rate") or "0")),
-        status=str(row.get("status") or "active"),
+        tax_mode=tax_mode,
+        tax_rate=tax_rate,
+        status=status,
         trial_ends=trial_ends,
     )
 

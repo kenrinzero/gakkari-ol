@@ -23,6 +23,7 @@ from textual.widgets.option_list import Option
 from gakkari import io as gio
 from gakkari.currency import get_rate
 from gakkari.db import (
+    delete_renewal,
     get_conn,
     insert_renewal,
     insert_subscription,
@@ -80,6 +81,7 @@ class MainScreen(Screen):
         Binding("e", "edit", "Edit"),
         Binding("d", "delete", "Delete"),
         Binding("k", "advance_renewal", "Kept it"),
+        Binding("u", "undo_advance", "Undo"),
         Binding("right", "open_notes", "Notes", key_display="→", priority=True),
         Binding("slash", "focus_filter", "Filter", key_display="/"),
         Binding("g", "toggle_gross_net", "Gross/Net"),
@@ -215,6 +217,8 @@ class MainScreen(Screen):
         # different currency than the base used for totals/sort.
         self._conv_rates: dict[str, Decimal] = {}
         self._last_seen_date: date = date.today()
+        # Single-level undo for the last `k`: (sub_id, old_date, new_date, log_id).
+        self._last_advance: tuple[int, date, date, int] | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="layout"):
@@ -272,7 +276,7 @@ class MainScreen(Screen):
             "toggle_notices", "focus_filter", "toggle_gross_net",
             "toggle_paused", "settings", "export", "import_subs",
             "cycle_sort", "cycle_totals", "toggle_convert", "advance_renewal",
-            "toggle_cancelled", "open_history",
+            "undo_advance", "toggle_cancelled", "open_history",
         ):
             return False
         if not self._notes_active and action == "save_notes":
@@ -670,7 +674,7 @@ class MainScreen(Screen):
         renewal_amount = sub.display_amount(self._settings.price_display_mode)
         with get_conn() as conn:
             update_subscription(conn, sub)
-            insert_renewal(
+            log_id = insert_renewal(
                 conn,
                 subscription_id=sub.id,
                 renewed_on=old_date,
@@ -678,15 +682,42 @@ class MainScreen(Screen):
                 currency=sub.currency,
                 billing_period=sub.billing_period,
             )
+        # Stash for a single-level undo (`u`). Overwriting here means undo only
+        # ever targets the genuinely-last advance.
+        self._last_advance = (sub.id, old_date, sub.next_renewal_date, log_id)
         self._load_subs()
         self.notify(
             t("advance_notify", self._lang).format(
                 name=sub.name,
                 old=fmt_date(old_date, self._lang),
                 new=fmt_date(sub.next_renewal_date, self._lang),
-            ),
+            )
+            + f"  ({t('undo_hint', self._lang)})",
             timeout=4,
         )
+
+    def action_undo_advance(self) -> None:
+        if self._last_advance is None:
+            self.notify(t("undo_nothing", self._lang), timeout=2)
+            return
+        sub_id, old_date, new_date, log_id = self._last_advance
+        self._last_advance = None  # single-level — consume immediately
+        with get_conn() as conn:
+            # Only roll the date back if it hasn't changed since (e.g. the user
+            # edited the sub after pressing k); always drop the log row we
+            # created, since undo reverts that specific acknowledgement.
+            row = conn.execute(
+                "SELECT next_renewal_date FROM subscriptions WHERE id=?",
+                (sub_id,),
+            ).fetchone()
+            if row is not None and row["next_renewal_date"] == new_date:
+                conn.execute(
+                    "UPDATE subscriptions SET next_renewal_date=? WHERE id=?",
+                    (old_date, sub_id),
+                )
+            delete_renewal(conn, log_id)
+        self._load_subs()
+        self.notify(t("undo_done", self._lang), timeout=3)
 
     @work
     async def action_delete(self) -> None:
@@ -883,6 +914,28 @@ class MainScreen(Screen):
             self.notify(str(e), severity="error", timeout=6)
             return
         if subs:
+            # Guard against silently doubling rows on a repeat import: count
+            # likely duplicates against what's already loaded, and confirm.
+            existing = {
+                (s.name.strip().casefold(), s.amount, s.currency)
+                for s in self._all_subs
+            }
+            dups = sum(
+                1 for s in subs
+                if (s.name.strip().casefold(), s.amount, s.currency) in existing
+            )
+            if dups:
+                msg = t("import_confirm_dups", self._lang).format(
+                    count=len(subs), dups=dups
+                )
+            else:
+                msg = t("import_confirm", self._lang).format(count=len(subs))
+            confirmed = await self.app.push_screen_wait(
+                ConfirmModal(msg, lang=self._lang)
+            )
+            if not confirmed:
+                self.notify(t("import_cancelled", self._lang), timeout=3)
+                return
             with get_conn() as conn:
                 for sub in subs:
                     insert_subscription(conn, sub)
