@@ -132,6 +132,8 @@ class NoticePanel(Static):
                 ("x", "bind_export"),
                 ("i", "bind_import"),
                 ("l", "bind_lang"),
+                ("?", "bind_help"),
+                ("Esc", "bind_back"),
                 ("q", "bind_quit"),
             )),
         )
