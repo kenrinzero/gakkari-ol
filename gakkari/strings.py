@@ -37,6 +37,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "duplicate_suffix": "(copy)",
         "bind_advance": "Kept it",
         "bind_undo": "Undo",
+        "bind_resume": "Resume",
         "bind_quit": "Quit",
         "bind_help": "Help",
         "bind_back": "Back",
@@ -90,6 +91,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "undo_hint": "u to undo",
         "undo_done": "Renewal undone",
         "undo_nothing": "Nothing to undo",
+        "resume_notify": "Resumed {name}",
         # History screen (Phase 6)
         "bind_history": "History",
         "bind_notes": "Notes",
@@ -139,7 +141,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "Exported {count} subscription(s) to {path}",
         # Misc UI
         "title_shortcuts": "Keyboard shortcuts",
-        "help_text": "a Add · e Edit · d Delete · D Duplicate · k Kept it · u Undo · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · l Lang · n Notices · q Quit",
+        "help_text": "a Add · e Edit · d Delete · D Duplicate · k Kept it · u Undo · r Resume · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · l Lang · n Notices · q Quit",
         "no_subs": "No subscriptions. Press [a] to add one.",
         "due_soon": "▲ DUE SOON",
         "no_notes": "no notes",
@@ -224,6 +226,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "duplicate_suffix": "（コピー）",
         "bind_advance": "更新済",
         "bind_undo": "取消",
+        "bind_resume": "再開",
         "bind_quit": "終了",
         "bind_help": "ヘルプ",
         "bind_back": "戻る",
@@ -277,6 +280,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "undo_hint": "u で取消",
         "undo_done": "更新を取り消しました",
         "undo_nothing": "取り消す操作がありません",
+        "resume_notify": "{name} を再開しました",
         # History screen (Phase 6)
         "bind_history": "履歴",
         "bind_notes": "メモ",
@@ -326,7 +330,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "{count}件を {path} に書き出しました",
         # Misc UI
         "title_shortcuts": "キーボードショートカット",
-        "help_text": "a 追加 · e 編集 · d 削除 · D 複製 · k 更新済 · u 取消 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · l 言語 · n 通知 · q 終了",
+        "help_text": "a 追加 · e 編集 · d 削除 · D 複製 · k 更新済 · u 取消 · r 再開 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · l 言語 · n 通知 · q 終了",
         "no_subs": "サブスクなし。[a] で追加。",
         "due_soon": "▲ 期限近",
         "no_notes": "メモなし",
