@@ -2,7 +2,7 @@
 
 Terminal subscription tracker. Python + Textual TUI, SQLite storage, local-only.
 
-**Tone:** calm, serious, readable, slightly stylized. No gamification. (A Phase-4 anime office-lady mascot screen was added and later removed — it was presentation polish, not the product.)
+**Tone:** calm, serious, readable, slightly stylized. No gamification. (A Phase-4 anime office-lady mascot screen was added and later removed — it was presentation polish, not the product. The mascot ASCII art is deliberately kept on the landing page `docs/index.html` as external decoration — don't flag it there as removal residue.)
 
 ---
 
@@ -77,7 +77,7 @@ docs/
 - **Storage:** SQLite via stdlib `sqlite3`. DB file lives at `data/gakkari.db`.
 - **Money:** always `Decimal`, never `float`. SQLite stores money as TEXT and converts back via a registered adapter. Do not change this.
 - **Dates:** `datetime.date` objects throughout. SQLite stores as ISO TEXT and converts back via a registered adapter. Never parse dates from raw strings in business logic.
-- **Currency conversion:** uses `frankfurter.dev` (no API key, ECB-derived, daily). `httpx` is already installed. Conversion logic: convert first, then apply tax.
+- **Currency conversion:** uses `frankfurter.dev` (no API key, ECB-derived, daily — the code calls `https://api.frankfurter.dev/v1/latest`). `httpx` is already installed. Conversion logic: rate conversion and net/gross tax derivation are both scalar `Decimal` operations with no intermediate rounding, so they commute — order is immaterial (the code derives the display-mode amount, then multiplies by the rate).
 - **Tax display:** global `price_display_mode` in Settings (`"net"` or `"gross"`). Each subscription row stores `tax_mode` (`none` / `inclusive` / `exclusive`) and `tax_rate`. Net/gross derivation lives on the `Subscription` model (`net_amount()`, `gross_amount()`).
 - **Automation boundary:** renewal calculation and notice generation belong in the app. Windows Task Scheduler is an outer trigger only (Phase 5).
 - **Scope:** no accounts, no cloud sync, no web rewrite. Local tool only.
@@ -117,7 +117,7 @@ ExchangeRateCache:
 
 `billing_period` values: `"monthly"` `"yearly"` `"quarterly"` `"weekly"` `"half_yearly"`.
 
-Subscriptions are never hard-deleted for historical accuracy — use `status = "cancelled"` instead. `is_active` from the original spec became a three-way `status` field. Cancelled rows are hidden by default; press `v` to surface them dimmed for reference.
+Subscriptions are never hard-deleted for historical accuracy — use `status = "cancelled"` instead. There is deliberately **no hard-delete helper** in `db.py` (the unused `delete_subscription` was removed); deletion always routes through `ConfirmModal` → `status = "cancelled"` via `update_subscription`. `is_active` from the original spec became a three-way `status` field. Cancelled rows are hidden by default; press `v` to surface them dimmed for reference.
 
 `trial_ends` is `None` for most subs. When set and within the notice window, the notice panel emits a louder trial-expiry post (distinct kaomoji pool, "trial ends today!" body) on the expiry date in place of (or alongside) the regular renewal post for that day.
 
