@@ -9,7 +9,10 @@ BILLING_PERIODS = ("monthly", "yearly", "quarterly", "weekly", "half_yearly")
 STATUSES = ("active", "paused", "cancelled")
 TAX_MODES = ("none", "inclusive", "exclusive")
 PRICE_DISPLAY_MODES = ("net", "gross")
-TOTALS_VIEW_MODES = ("estimate", "monthly_strict", "yearly_strict", "by_period", "income")
+TOTALS_VIEW_MODES = (
+    "estimate", "monthly_strict", "yearly_strict",
+    "by_period", "by_category", "forecast", "income",
+)
 SORT_MODES = ("date", "period", "name", "amount")
 
 _MONTHLY_FACTORS: dict[str, Decimal] = {
@@ -34,6 +37,7 @@ class Subscription:
     tax_rate: Decimal = field(default_factory=lambda: Decimal("0"))
     status: str = "active"
     trial_ends: date | None = None
+    payment_method: str = ""  # optional funding source, e.g. "Visa …1234"
     id: int | None = None
 
     def days_until_renewal(self, today: date | None = None) -> int:

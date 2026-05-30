@@ -33,6 +33,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_add": "Add",
         "bind_edit": "Edit",
         "bind_delete": "Delete",
+        "bind_duplicate": "Duplicate",
+        "duplicate_suffix": "(copy)",
         "bind_advance": "Kept it",
         "bind_undo": "Undo",
         "bind_quit": "Quit",
@@ -58,6 +60,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "paused_shown": "+paused",
         "cancelled_shown": "+archive",
         "rate_fallback_warning": "rate",
+        "rate_stale_warning": "stale",
         # Sort modes (Phase 6)
         "sort_date": "date",
         "sort_period": "period",
@@ -69,12 +72,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "monthly only",
         "totals_mode_yearly_strict": "yearly only",
         "totals_mode_by_period": "by period",
+        "totals_mode_by_category": "by category",
+        "totals_mode_forecast": "forecast",
+        "forecast_within": "≤{d}d",
         # Income totals mode (amortized monthly vs income)
         "income_label": "income",
         "income_committed": "committed",
         "income_left": "left",
         "income_over": "over",
         "income_unset": "set monthly income in settings (s)",
+        "budget_over": "▲ {base} {over} over budget ({pct}%)",
         # Conversion column (Phase 6)
         "indicator_conv": "conv→{target}",
         # Auto-advance (Phase 6)
@@ -88,6 +95,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "history_title": "Renewal history — {count} entries · total {base} {total}",
         "history_title_empty": "Renewal history",
         "history_empty_msg": "No renewals logged yet. Press [k] on a sub to log one.",
+        "history_month_est": "est {base} {est}/mo",
         # DB error notifications (Phase 6)
         "settings_load_error": "Could not load settings: {err}",
         "settings_save_error": "Could not save settings: {err}",
@@ -130,7 +138,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "Exported {count} subscription(s) to {path}",
         # Misc UI
         "title_shortcuts": "Keyboard shortcuts",
-        "help_text": "a Add · e Edit · d Delete · k Kept it · u Undo · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · l Lang · n Notices · q Quit",
+        "help_text": "a Add · e Edit · d Delete · D Duplicate · k Kept it · u Undo · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · l Lang · n Notices · q Quit",
         "no_subs": "No subscriptions. Press [a] to add one.",
         "due_soon": "▲ DUE SOON",
         "no_notes": "no notes",
@@ -168,6 +176,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "field_tax_mode": "Tax mode",
         "field_tax_rate": "Tax rate (%)",
         "field_trial_ends": "Trial ends (optional)",
+        "field_payment_method": "Payment method (optional)",
         # Due-soon inline
         "due_days": "days",
         # Known categories
@@ -210,6 +219,8 @@ _STRINGS: dict[str, dict[str, str]] = {
         "bind_add": "追加",
         "bind_edit": "編集",
         "bind_delete": "削除",
+        "bind_duplicate": "複製",
+        "duplicate_suffix": "（コピー）",
         "bind_advance": "更新済",
         "bind_undo": "取消",
         "bind_quit": "終了",
@@ -235,6 +246,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "paused_shown": "+停止中",
         "cancelled_shown": "+解約済",
         "rate_fallback_warning": "為替",
+        "rate_stale_warning": "為替(古)",
         # Sort modes (Phase 6)
         "sort_date": "日付",
         "sort_period": "周期",
@@ -246,12 +258,16 @@ _STRINGS: dict[str, dict[str, str]] = {
         "totals_mode_monthly_strict": "月次のみ",
         "totals_mode_yearly_strict": "年次のみ",
         "totals_mode_by_period": "周期別",
+        "totals_mode_by_category": "種別別",
+        "totals_mode_forecast": "予測",
+        "forecast_within": "≤{d}日",
         # Income totals mode (amortized monthly vs income)
         "income_label": "収入",
         "income_committed": "支出",
         "income_left": "残り",
         "income_over": "超過",
         "income_unset": "設定で月収を入力してください",
+        "budget_over": "▲ {base} {over} 予算超過（{pct}%）",
         # Conversion column (Phase 6)
         "indicator_conv": "換算→{target}",
         # Auto-advance (Phase 6)
@@ -265,6 +281,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "history_title": "更新履歴 — {count}件 · 合計 {base} {total}",
         "history_title_empty": "更新履歴",
         "history_empty_msg": "履歴なし。サブスクで [k] を押して記録。",
+        "history_month_est": "概算 {base} {est}/月",
         # DB error notifications (Phase 6)
         "settings_load_error": "設定の読込に失敗: {err}",
         "settings_save_error": "設定の保存に失敗: {err}",
@@ -307,7 +324,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "{count}件を {path} に書き出しました",
         # Misc UI
         "title_shortcuts": "キーボードショートカット",
-        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · u 取消 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · l 言語 · n 通知 · q 終了",
+        "help_text": "a 追加 · e 編集 · d 削除 · D 複製 · k 更新済 · u 取消 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · l 言語 · n 通知 · q 終了",
         "no_subs": "サブスクなし。[a] で追加。",
         "due_soon": "▲ 期限近",
         "no_notes": "メモなし",
@@ -345,6 +362,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "field_tax_mode": "税区分",
         "field_tax_rate": "税率 (%)",
         "field_trial_ends": "体験版終了日（任意）",
+        "field_payment_method": "支払い方法（任意）",
         # Due-soon inline
         "due_days": "日",
         # Known categories

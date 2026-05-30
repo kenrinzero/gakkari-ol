@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from contextlib import contextmanager
 from datetime import date
@@ -9,8 +10,19 @@ from pathlib import Path
 from gakkari.models import RenewalLog, Settings, Subscription
 
 DB_PATH = Path(__file__).parent.parent / "data" / "gakkari.db"
-BACKUP_DIR = DB_PATH.parent / "backups"
 BACKUP_KEEP = 7  # rotating daily snapshots to retain
+
+
+def _db_path() -> Path:
+    """Resolved DB path. The GAKKARI_DB env var overrides the default, letting
+    tests and tooling point at an alternate DB; read at call-time so there are
+    no import-order traps."""
+    env = os.environ.get("GAKKARI_DB")
+    return Path(env) if env else DB_PATH
+
+
+def _backup_dir() -> Path:
+    return _db_path().parent / "backups"
 
 
 def _adapt_decimal(d: Decimal) -> str:
@@ -47,7 +59,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     tax_mode         TEXT    NOT NULL DEFAULT 'none',
     tax_rate         DECIMAL NOT NULL DEFAULT '0',
     status           TEXT    NOT NULL DEFAULT 'active',
-    trial_ends       DATE
+    trial_ends       DATE,
+    payment_method   TEXT    NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -89,8 +102,9 @@ CREATE INDEX IF NOT EXISTS idx_renewal_log_sub ON renewal_log(subscription_id);
 
 @contextmanager
 def get_conn():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+    path = _db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -116,14 +130,16 @@ def backup_db(today: date | None = None) -> Path | None:
     startup continues. Returns the snapshot path if one was written, else None.
     """
     today = today or date.today()
-    if not DB_PATH.exists():
+    db_path = _db_path()
+    if not db_path.exists():
         return None  # nothing to back up yet (first run)
     try:
-        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        dest = BACKUP_DIR / f"gakkari-{today.isoformat()}.db"
+        backup_dir = _backup_dir()
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        dest = backup_dir / f"gakkari-{today.isoformat()}.db"
         if dest.exists():
             return None  # already snapshotted today
-        src = sqlite3.connect(DB_PATH)
+        src = sqlite3.connect(db_path)
         try:
             dst = sqlite3.connect(dest)
             try:
@@ -133,7 +149,7 @@ def backup_db(today: date | None = None) -> Path | None:
         finally:
             src.close()
         # Filenames sort chronologically (ISO date), so drop all but the newest.
-        for old in sorted(BACKUP_DIR.glob("gakkari-*.db"))[:-BACKUP_KEEP]:
+        for old in sorted(backup_dir.glob("gakkari-*.db"))[:-BACKUP_KEEP]:
             try:
                 old.unlink()
             except OSError:
@@ -157,6 +173,7 @@ def init_db() -> None:
             "ALTER TABLE settings ADD COLUMN totals_view_mode TEXT NOT NULL DEFAULT 'estimate'",
             "ALTER TABLE settings ADD COLUMN sort_mode TEXT NOT NULL DEFAULT 'date'",
             "ALTER TABLE subscriptions ADD COLUMN trial_ends DATE",
+            "ALTER TABLE subscriptions ADD COLUMN payment_method TEXT NOT NULL DEFAULT ''",
         )
         for stmt in _migrations:
             try:
@@ -181,6 +198,7 @@ def _row_to_sub(row: sqlite3.Row) -> Subscription:
         tax_rate=row["tax_rate"],
         status=row["status"],
         trial_ends=row["trial_ends"],
+        payment_method=row["payment_method"],
     )
 
 
@@ -200,11 +218,13 @@ def insert_subscription(conn: sqlite3.Connection, sub: Subscription) -> int:
     cur = conn.execute(
         """INSERT INTO subscriptions
            (name, amount, currency, billing_period, next_renewal_date,
-            category, notes, tax_mode, tax_rate, status, trial_ends)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            category, notes, tax_mode, tax_rate, status, trial_ends,
+            payment_method)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (sub.name, sub.amount, sub.currency, sub.billing_period,
          sub.next_renewal_date, sub.category, sub.notes,
-         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends),
+         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends,
+         sub.payment_method),
     )
     return cur.lastrowid
 
@@ -213,11 +233,13 @@ def update_subscription(conn: sqlite3.Connection, sub: Subscription) -> None:
     conn.execute(
         """UPDATE subscriptions SET
            name=?, amount=?, currency=?, billing_period=?, next_renewal_date=?,
-           category=?, notes=?, tax_mode=?, tax_rate=?, status=?, trial_ends=?
+           category=?, notes=?, tax_mode=?, tax_rate=?, status=?, trial_ends=?,
+           payment_method=?
            WHERE id=?""",
         (sub.name, sub.amount, sub.currency, sub.billing_period,
          sub.next_renewal_date, sub.category, sub.notes,
-         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends, sub.id),
+         sub.tax_mode, sub.tax_rate, sub.status, sub.trial_ends,
+         sub.payment_method, sub.id),
     )
 
 
@@ -271,6 +293,22 @@ def get_cached_rate(
     if row is None or row["fetched_at"] != today:
         return None
     return row["rate"]
+
+
+def get_last_rate(
+    conn: sqlite3.Connection, base: str, quote: str
+) -> tuple[Decimal, date] | None:
+    """Most recent cached rate for the pair regardless of age, as
+    (rate, fetched_at), or None if it was never cached. Lets a failed live
+    fetch fall back to a real (if old) rate instead of collapsing to 1:1."""
+    row = conn.execute(
+        "SELECT rate, fetched_at FROM exchange_rate_cache "
+        "WHERE base_currency=? AND quote_currency=?",
+        (base, quote),
+    ).fetchone()
+    if row is None:
+        return None
+    return row["rate"], row["fetched_at"]
 
 
 def upsert_rate(
