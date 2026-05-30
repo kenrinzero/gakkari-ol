@@ -194,6 +194,14 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **i18n:** full EN+JA bundle covering all surfaces. Always-JA weekday labels are intentional flavor (textboard authenticity).
 - **CLI (Phase 5):** `python -m gakkari --notice` reads the DB and prints today's renewals + a 7-day preview to stdout, then exits. Designed to be called from Windows Task Scheduler on login. `--lang en|ja` overrides the saved UI language. `sys.stdout.reconfigure(encoding="utf-8")` keeps the JA banner and kaomoji from crashing the legacy Console Host. Task Scheduler recipe lives in [docs/scheduler.md](docs/scheduler.md).
 
+### Safety net (post-Phase 6)
+
+A trio of guards around the two "your data is precious, there's no cloud" risks — the only irreversible action and the single local DB.
+
+- **Undo last `k` (`u`):** single-level, session-scoped. `action_advance_renewal` stashes `(sub_id, old_date, new_date, log_id)`; `u` (`action_undo_advance`) restores the date (only if it hasn't changed since) and deletes that one `renewal_log` row via `db.delete_renewal`. The ledger stays append-only *except* for this explicit undo of the row you just created. The stash is overwritten on each `k` and consumed on use, so undo only ever targets the genuinely-last advance.
+- **Daily DB backup:** `db.backup_db()` runs inside `init_db()`, so both the TUI and the `--notice` CLI trigger it. Once-per-day rotating snapshot of `data/gakkari.db` → `data/backups/gakkari-YYYY-MM-DD.db` via SQLite's online backup API (WAL-safe, not a file copy), keeping the newest `BACKUP_KEEP` (7). Best-effort: it never raises and never blocks launch (skips cleanly on first run when there's no DB yet).
+- **Import validation + de-dup guard:** `io._row_to_sub` rejects out-of-domain `billing_period` / `status` / `tax_mode`, non-3-letter currencies, and negative amounts (raised as per-row `ValueError`s the importer already collects, so one bad row no longer imports silently or aborts the file). `action_import_subs` counts likely duplicates (`name`+`amount`+`currency`) against the loaded set and routes through `ConfirmModal` before inserting — a repeat import can't silently double rows.
+
 ---
 
 ## Layout
