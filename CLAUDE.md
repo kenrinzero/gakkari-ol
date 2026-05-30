@@ -46,7 +46,7 @@ gakkari/
   db.py              SQLite helpers — schema, CRUD, exchange rate cache, renewal log
   models.py          Subscription, Settings, RenewalLog, _MONTHLY_FACTORS, date helpers
   strings.py         i18n tables (EN + JA), fmt_* helpers
-  currency.py        get_rate — frankfurter.app fetch + daily SQLite cache
+  currency.py        get_rate — frankfurter.dev fetch + daily SQLite cache
   io.py              CSV + JSON import/export
   notices.py         pure logic for the rolling notice board (1–2 week window, trial expiry)
   ui/
@@ -77,7 +77,7 @@ docs/
 - **Storage:** SQLite via stdlib `sqlite3`. DB file lives at `data/gakkari.db`.
 - **Money:** always `Decimal`, never `float`. SQLite stores money as TEXT and converts back via a registered adapter. Do not change this.
 - **Dates:** `datetime.date` objects throughout. SQLite stores as ISO TEXT and converts back via a registered adapter. Never parse dates from raw strings in business logic.
-- **Currency conversion:** will use `frankfurter.app` (no API key, ECB-derived, daily). `httpx` is already installed. Conversion logic: convert first, then apply tax.
+- **Currency conversion:** uses `frankfurter.dev` (no API key, ECB-derived, daily). `httpx` is already installed. Conversion logic: convert first, then apply tax.
 - **Tax display:** global `price_display_mode` in Settings (`"net"` or `"gross"`). Each subscription row stores `tax_mode` (`none` / `inclusive` / `exclusive`) and `tax_rate`. Net/gross derivation lives on the `Subscription` model (`net_amount()`, `gross_amount()`).
 - **Automation boundary:** renewal calculation and notice generation belong in the app. Windows Task Scheduler is an outer trigger only (Phase 5).
 - **Scope:** no accounts, no cloud sync, no web rewrite. Local tool only.

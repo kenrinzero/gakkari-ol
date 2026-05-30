@@ -179,10 +179,6 @@ def update_subscription(conn: sqlite3.Connection, sub: Subscription) -> None:
     )
 
 
-def delete_subscription(conn: sqlite3.Connection, sub_id: int) -> None:
-    conn.execute("DELETE FROM subscriptions WHERE id=?", (sub_id,))
-
-
 # ── Settings ─────────────────────────────────────────────────────────────────
 
 def load_settings(conn: sqlite3.Connection) -> Settings:

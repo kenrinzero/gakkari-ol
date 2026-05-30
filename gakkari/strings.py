@@ -123,7 +123,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "Exported {count} subscription(s) to {path}",
         # Misc UI
         "title_shortcuts": "Keyboard shortcuts",
-        "help_text": "a Add · e Edit · d Delete · k Kept it · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · L Lang · n Notices · q Quit",
+        "help_text": "a Add · e Edit · d Delete · k Kept it · h History · / Filter · g Gross/Net · p Paused · v Archive · o Sort · t Totals · c Convert · s Settings · x Export · i Import · l Lang · n Notices · q Quit",
         "no_subs": "No subscriptions. Press [a] to add one.",
         "due_soon": "▲ DUE SOON",
         "no_notes": "no notes",
@@ -293,7 +293,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "export_success": "{count}件を {path} に書き出しました",
         # Misc UI
         "title_shortcuts": "キーボードショートカット",
-        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · L 言語 · n 通知 · q 終了",
+        "help_text": "a 追加 · e 編集 · d 削除 · k 更新済 · h 履歴 · / 絞込 · g 税込/抜 · p 停止中 · v 解約済 · o 並替 · t 合計 · c 換算 · s 設定 · x 書出 · i 読込 · l 言語 · n 通知 · q 終了",
         "no_subs": "サブスクなし。[a] で追加。",
         "due_soon": "▲ 期限近",
         "no_notes": "メモなし",

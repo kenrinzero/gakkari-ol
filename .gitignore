@@ -23,5 +23,5 @@ build/
 # Claude Code internal: worktrees, settings, agent state
 .claude/
 
-# Mascot art source/mockup workspace — bundled tiers live in gakkari/assets/
+# Mascot art source/mockup workspace (local only; not part of the shipped tool)
 mascot/

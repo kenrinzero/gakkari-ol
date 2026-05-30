@@ -119,7 +119,7 @@ class NoticePanel(Static):
                 ("s", "bind_settings"),
                 ("x", "bind_export"),
                 ("i", "bind_import"),
-                ("L", "bind_lang"),
+                ("l", "bind_lang"),
                 ("q", "bind_quit"),
             )),
         )

@@ -55,7 +55,7 @@ The SQLite database is created on first launch at `data/gakkari.db` inside the p
 - **Archive view (`v`)** — surface cancelled subs dimmed for reference without un-deleting them.
 - **Adaptive notice board** — Japanese textboard styling with a rolling 1-to-2-week window that expands as your terminal gets taller. Deterministic kaomoji per day, EN/JA bilingual. Press `n` to flip between notices and a categorized keybindings tutorial.
 - **Trial expiry warnings** — optional `trial_ends` per sub; the notice board surfaces an alarmed-kaomoji post on the day a trial converts to paid.
-- **Multi-currency totals** — exchange rates fetched daily from [frankfurter.app](https://www.frankfurter.app/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.
+- **Multi-currency totals** — exchange rates fetched daily from [frankfurter.dev](https://frankfurter.dev/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.
 - **Sort (`o`) and totals (`t`) cycles** — sort by date / period / name / amount; totals as monthly+yearly estimate, strict-monthly, strict-yearly, per-period breakdown, or income (amortized spend vs. your monthly income).
 - **Conversion column (`c`)** — show each row's amount converted to your base (or any chosen) currency next to its native price, so you stop doing mental currency math.
 - **Gross / net VAT display mode**, per-row tax mode and rate.
@@ -83,9 +83,9 @@ Built collaboratively with several AI models. Each contributed a distinct stage 
 - **Mistral Large 2** — original concept
 - **Grok Imagine** — mascot character design
 - **Claude Sonnet 4.7** — initial scaffold and visual style
-- **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board, mascot)
-- **Claude Opus 4.7** — Phases 5–6: CLI entry point, two-column restructure, mascot + history screens, auto-advance + renewal ledger, archive view, trial-expiry warnings, sort/totals/convert cycles, adaptive notice window, tutorial alt-state
-- **Claude Opus 4.8** — mascot resize fix, convert-column currency decoupled from base (+ Settings-save reset bugfix), income totals mode
+- **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board)
+- **Claude Opus 4.7** — Phases 5–6: CLI entry point, two-column restructure, history screen, auto-advance + renewal ledger, archive view, trial-expiry warnings, sort/totals/convert cycles, adaptive notice window, tutorial alt-state
+- **Claude Opus 4.8** — convert-column currency decoupled from base (+ Settings-save reset bugfix), income totals mode
 
 ## License
 
