@@ -13,6 +13,20 @@ from gakkari.models import BILLING_PERIODS, STATUSES, TAX_MODES, Subscription
 from gakkari.strings import fmt_period, fmt_status, fmt_tax_mode, t
 
 
+def _status_options(sub: Subscription | None, lang: str) -> list[tuple[str, str]]:
+    """Status choices for the form. 'cancelled' is normally hidden — you cancel
+    via delete, not the dropdown — but an already-cancelled sub being edited
+    must include it, or the Select rejects the value and the modal crashes on
+    mount. Surfacing it also lets the user switch the row back to active/paused
+    (resume) straight from the edit form."""
+    allow_cancelled = sub is not None and sub.status == "cancelled"
+    return [
+        (fmt_status(s, lang), s)
+        for s in STATUSES
+        if s != "cancelled" or allow_cancelled
+    ]
+
+
 class SubscriptionModal(ModalScreen[Subscription | None]):
 
     BINDINGS = [
@@ -87,9 +101,7 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
 
         period_options = [(fmt_period(p, lang), p) for p in BILLING_PERIODS]
         tax_options = [(fmt_tax_mode(m, lang), m) for m in TAX_MODES]
-        status_options = [
-            (fmt_status(s, lang), s) for s in STATUSES if s != "cancelled"
-        ]
+        status_options = _status_options(self._sub, lang)
 
         with Vertical(id="dialog"):
             yield Label(title, id="dialog-title")

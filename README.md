@@ -52,7 +52,7 @@ The SQLite database is created on first launch at `data/gakkari.db` inside the p
 - Subscription CRUD with soft-delete (`status` = active / paused / cancelled), keyboard-only navigation, notes drill-in.
 - **Auto-advance (`k`) + undo (`u`)** — one keystroke advances a sub's renewal date by one billing cycle (with month-end + leap-year clamping) and logs it to a local ledger; `u` reverses the last one if you mis-pressed.
 - **History view (`h`)** — renewal ledger grouped by month with per-month subtotals; the current month also shows your amortized estimate so actual spend reads against it. Running total in your base currency.
-- **Archive view (`v`)** — surface cancelled subs dimmed for reference without un-deleting them.
+- **Archive view (`v`) + resume (`r`)** — surface cancelled subs dimmed for reference; press `r` to resume (un-cancel) the highlighted one.
 - **Adaptive notice board** — Japanese textboard styling with a rolling 1-to-2-week window that expands as your terminal gets taller. Deterministic kaomoji per day, EN/JA bilingual. Press `n` to flip between notices and a categorized keybindings tutorial.
 - **Trial expiry warnings** — optional `trial_ends` per sub; the notice board surfaces an alarmed-kaomoji post on the day a trial converts to paid.
 - **Multi-currency totals** — exchange rates fetched daily from [frankfurter.dev](https://frankfurter.dev/) (ECB-derived, no API key) and cached locally. Bad currency codes fall back gracefully with an inline warning.

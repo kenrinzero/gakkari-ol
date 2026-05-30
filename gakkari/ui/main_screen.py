@@ -79,6 +79,7 @@ class MainScreen(Screen):
         Binding("D", "duplicate", "Duplicate"),
         Binding("k", "advance_renewal", "Kept it"),
         Binding("u", "undo_advance", "Undo"),
+        Binding("r", "resume", "Resume"),
         Binding("right", "open_notes", "Notes", key_display="→", priority=True),
         Binding("slash", "focus_filter", "Filter", key_display="/"),
         Binding("g", "toggle_gross_net", "Gross/Net"),
@@ -270,7 +271,7 @@ class MainScreen(Screen):
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if self._notes_active and action in (
-            "add", "edit", "delete", "duplicate", "open_notes", "help",
+            "add", "edit", "delete", "duplicate", "resume", "open_notes", "help",
             "toggle_notices", "focus_filter", "toggle_gross_net",
             "toggle_paused", "settings", "export", "import_subs",
             "cycle_sort", "cycle_totals", "toggle_convert", "advance_renewal",
@@ -756,6 +757,24 @@ class MainScreen(Screen):
                 option_list.highlighted = min(
                     prev_idx or 0, len(self._subs) - 1
                 )
+
+    def action_resume(self) -> None:
+        """Un-cancel the highlighted sub (surfaced via Archive view, `v`).
+        No-op on a sub that isn't cancelled."""
+        sub = self._current_sub()
+        if sub is None or sub.status != "cancelled":
+            return
+        sub.status = "active"
+        prev_idx = self.query_one("#list-view", OptionList).highlighted
+        with get_conn() as conn:
+            update_subscription(conn, sub)
+        self._load_subs()
+        option_list = self.query_one("#list-view", OptionList)
+        if self._subs:
+            option_list.highlighted = min(prev_idx or 0, len(self._subs) - 1)
+        self.notify(
+            t("resume_notify", self._lang).format(name=sub.name), timeout=3
+        )
 
     # ── Notes flow ──────────────────────────────────────────────────────
 

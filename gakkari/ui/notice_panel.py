@@ -112,6 +112,7 @@ class NoticePanel(Static):
                 ("D", "bind_duplicate"),
                 ("k", "bind_advance"),
                 ("u", "bind_undo"),
+                ("r", "bind_resume"),
                 ("→", "bind_notes"),
             )),
             ("tutorial_section_views", (
