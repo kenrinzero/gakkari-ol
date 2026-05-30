@@ -11,9 +11,10 @@ from textual.screen import Screen
 from textual.widgets import Footer, OptionList, Static
 from textual.widgets.option_list import Option
 
+from gakkari import totals
 from gakkari.currency import get_rate
-from gakkari.db import get_conn, list_renewals, load_settings
-from gakkari.models import RenewalLog, Settings
+from gakkari.db import get_conn, list_renewals, list_subscriptions, load_settings
+from gakkari.models import RenewalLog, Settings, Subscription
 from gakkari.strings import fmt_date, t
 
 
@@ -89,20 +90,24 @@ class HistoryScreen(Screen):
 
     def on_mount(self) -> None:
         entries: list[RenewalLog] = []
+        subs: list[Subscription] = []
         try:
             with get_conn() as conn:
                 self._settings = load_settings(conn)
                 entries = list_renewals(conn)
+                subs = list_subscriptions(conn, statuses=("active",))
         except Exception as e:
             self.notify(
                 t("history_load_error", self._lang).format(err=e),
                 severity="warning",
                 timeout=6,
             )
-        self._fill(entries)
+        self._fill(entries, subs)
         self.query_one("#history-list", OptionList).focus()
 
-    def _fill(self, entries: list[RenewalLog]) -> None:
+    def _fill(
+        self, entries: list[RenewalLog], subs: list[Subscription]
+    ) -> None:
         title = self.query_one("#history-title", Static)
         listing = self.query_one("#history-list", OptionList)
         listing.clear_options()
@@ -117,27 +122,77 @@ class HistoryScreen(Screen):
             return
 
         base = self._settings.base_currency
-        rates = self._rate_cache(entries, base)
+        rates = self._rate_cache(entries, subs, base)
         total = Decimal("0")
+        # Per-month subtotal + count, summed in base (entries arrive DESC).
+        month_total: dict[tuple[int, int], Decimal] = {}
+        month_count: dict[tuple[int, int], int] = {}
         for e in entries:
-            rate = rates.get(e.currency, Decimal("1"))
-            total += e.amount * rate
+            in_base = e.amount * rates.get(e.currency, Decimal("1"))
+            total += in_base
+            key = (e.renewed_on.year, e.renewed_on.month)
+            month_total[key] = month_total.get(key, Decimal("0")) + in_base
+            month_count[key] = month_count.get(key, 0) + 1
 
         title.update(
             t("history_title", self._lang).format(
-                count=len(entries),
-                base=base,
-                total=f"{total:,.2f}",
+                count=len(entries), base=base, total=f"{total:,.2f}",
             )
         )
+        # Current amortized monthly estimate — shown on the current month's
+        # header so actual-so-far reads against what you committed to.
+        estimate = totals.total_monthly_in_base(
+            subs, rates, self._settings.price_display_mode
+        )
+        today = date.today()
+        cur_key: tuple[int, int] | None = None
         for e in entries:
+            key = (e.renewed_on.year, e.renewed_on.month)
+            if key != cur_key:
+                cur_key = key
+                listing.add_option(
+                    Option(
+                        self._month_header(
+                            key, month_total[key], month_count[key],
+                            base, today, estimate,
+                        ),
+                        disabled=True,
+                    )
+                )
             listing.add_option(Option(self._render_entry(e, base, rates)))
 
+    def _month_header(
+        self,
+        key: tuple[int, int],
+        subtotal: Decimal,
+        count: int,
+        base: str,
+        today: date,
+        estimate: Decimal,
+    ) -> Text:
+        y, m = key
+        text = Text()
+        text.append(f"{y}-{m:02d}  ", style="bold #CC8800")
+        text.append(f"{base} {subtotal:,.2f} ({count})", style="#997000")
+        if (y, m) == (today.year, today.month):
+            text.append(
+                "  · "
+                + t("history_month_est", self._lang).format(
+                    base=base, est=f"{estimate:,.2f}"
+                ),
+                style="#554400",
+            )
+        return text
+
     def _rate_cache(
-        self, entries: list[RenewalLog], base: str
+        self,
+        entries: list[RenewalLog],
+        subs: list[Subscription],
+        base: str,
     ) -> dict[str, Decimal]:
         rates: dict[str, Decimal] = {base: Decimal("1")}
         needed = {e.currency for e in entries if e.currency and e.currency != base}
+        needed |= {s.currency for s in subs if s.currency and s.currency != base}
         if not needed:
             return rates
         with get_conn() as conn:

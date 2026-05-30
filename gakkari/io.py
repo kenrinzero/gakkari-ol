@@ -11,6 +11,7 @@ from gakkari.models import BILLING_PERIODS, STATUSES, TAX_MODES, Subscription
 _FIELDS = (
     "name", "amount", "currency", "billing_period", "next_renewal_date",
     "category", "notes", "tax_mode", "tax_rate", "status", "trial_ends",
+    "payment_method",
 )
 
 
@@ -27,6 +28,7 @@ def _sub_to_row(sub: Subscription) -> dict[str, str]:
         "tax_rate": str(sub.tax_rate),
         "status": sub.status,
         "trial_ends": sub.trial_ends.isoformat() if sub.trial_ends else "",
+        "payment_method": sub.payment_method,
     }
 
 
@@ -74,6 +76,7 @@ def _row_to_sub(row: dict) -> Subscription:
         tax_rate=tax_rate,
         status=status,
         trial_ends=trial_ends,
+        payment_method=str(row.get("payment_method") or ""),
     )
 
 

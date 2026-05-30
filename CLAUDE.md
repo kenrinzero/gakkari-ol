@@ -46,15 +46,16 @@ gakkari/
   db.py              SQLite helpers — schema, CRUD, exchange rate cache, renewal log
   models.py          Subscription, Settings, RenewalLog, _MONTHLY_FACTORS, date helpers
   strings.py         i18n tables (EN + JA), fmt_* helpers
-  currency.py        get_rate — frankfurter.dev fetch + daily SQLite cache
-  io.py              CSV + JSON import/export
+  currency.py        get_rate / get_rate_status — frankfurter.dev fetch + daily cache (fresh/stale/missing)
+  io.py              CSV + JSON import/export (validates enum/domain fields on import)
   notices.py         pure logic for the rolling notice board (1–2 week window, trial expiry)
+  totals.py          pure totals & sort math — testable, lifted out of MainScreen
   ui/
     __init__.py
     main_screen.py        MainScreen — list + filter + totals + CRUD + notes + right panel
     history_screen.py     HistoryScreen — renewal ledger with running total (h)
     confirm_modal.py      ConfirmModal — yes/no dialog
-    subscription_modal.py SubscriptionModal — add/edit form (incl. optional trial_ends)
+    subscription_modal.py SubscriptionModal — add/edit form (incl. trial_ends, payment_method)
     settings_modal.py     SettingsModal — base currency, gross/net, due-soon
     export_modal.py       ExportModal — format select + path
     import_modal.py       ImportModal — path with file-existence check
@@ -67,6 +68,11 @@ docs/
   Glass_TTY_VT220.ttf     bundled font (DEC VT220 bitmap, Latin/symbols)
   DotGothic16-subset.woff2  bundled font (16×16 pixel Japanese, subset to the codepoints used on the page)
   .nojekyll               disables GitHub's Jekyll so files serve as-is
+tests/                    pytest suite (run: pytest)
+  conftest.py             GAKKARI_DB-seam fixture for isolated DB tests
+  test_models.py · test_totals.py · test_io.py · test_db.py
+.github/workflows/
+  ci.yml                  pytest + non-UTF-8 CLI smoke on Python 3.12 / 3.13
 ```
 
 ---
@@ -91,7 +97,8 @@ Subscription:
   id, name, amount (Decimal), currency, billing_period, next_renewal_date (date),
   category, notes, tax_mode, tax_rate (Decimal),
   status,            # "active" | "paused" | "cancelled"
-  trial_ends         # date | None — optional free-trial expiry
+  trial_ends,        # date | None — optional free-trial expiry
+  payment_method     # str — optional funding source (e.g. "Visa …1234"); filterable
 
 Settings (singleton, id=1):
   base_currency, price_display_mode,           # "net" | "gross"
@@ -102,7 +109,7 @@ Settings (singleton, id=1):
   language,                                     # "en" | "ja"
   convert_column_enabled (bool),                # `c` row-level conversion column
   convert_currency,                             # `c` column target; blank → follow base_currency
-  totals_view_mode,                             # estimate | monthly_strict | yearly_strict | by_period
+  totals_view_mode,                             # estimate|monthly_strict|yearly_strict|by_period|by_category|forecast|income
   sort_mode                                     # date | period | name | amount
 
 RenewalLog:
@@ -180,17 +187,17 @@ DB-write failures at the consumer level (settings load/save, history load) surfa
 - **`MainScreen` layout:** two-column. Left 60% = `#center-panel` (title bar with mode/paused/sort/conv/cancelled indicators → filter `Input` → `ContentSwitcher` between `OptionList` and notes `TextArea`). Right 40% = `#right-panel` (NoticePanel).
 - **Full CRUD:** `SubscriptionModal`, `ConfirmModal` (soft-delete via `status = "cancelled"`). Notes drill-in (right-arrow open, Esc close+save, Ctrl+S explicit save). Has-notes dot (`●`/`◌`).
 - **Sort cycle (`o`):** date → period → name → amount. Sort happens in-memory in `_refresh_view` after filtering; sort by amount uses the rate cache so cross-currency comparisons are meaningful. Indicator `· sort:<mode>` shown when not default.
-- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (sum only `billing_period == "monthly"`) → yearly_strict (only yearly) → by_period (per-cadence subtotals, in `_PERIOD_ORDER`) → income.
+- **Totals cycle (`t`):** estimate (monthly + yearly normalized, default) → monthly_strict (only `monthly`) → yearly_strict (only yearly) → by_period (per-cadence subtotals) → by_category (per-category monthly-equivalent, top-5 + "+N") → forecast (concrete, non-amortized 30/60/90-day cash-out) → income. The math lives in `gakkari/totals.py` (pure, unit-tested).
 - **Income totals mode:** `income · committed · left (n%)`. "committed" is the **amortized** monthly figure (`_total_monthly_in_base`, same as `estimate` — yearly/quarterly subs folded to their /12 share) so "left" doesn't lurch in months with an annual renewal. Income has its **own currency** (`monthly_income_currency`, blank → base) — e.g. you earn in HUF but track/spend in EUR — and is converted to base for the comparison/%; its rate→base is fetched into `_rate_cache` by `_build_rate_cache` when income mode is active. When the income currency differs from base the line shows the native amount plus the base-equivalent: `HUF 100,000 income (≈ EUR 258) · EUR 200 committed · EUR 58 left (78%)`. Over budget shows `… over (n%)` instead of `left`. With `monthly_income == 0` (unset) it shows committed plus a "set monthly income in settings" nudge. Income amount + currency are set in the Settings modal (blank currency = base). A richer left-press budget panel is a possible later addition.
 - **Convert column (`c`):** when on, each row shows `9.99 USD  ≈ 9.20 EUR ●`. The conversion target is **`convert_currency`** if set, else `base_currency` — it is decoupled from the base so totals can stay in one currency (e.g. EUR at the top) while the column converts to another (e.g. JPY). Set the target in the Settings modal (blank = follow base). Rows where the sub currency equals the *target* show `—` in place of the conversion. Toggle indicator `· conv→<target>` in the title bar. Rates to the target are fetched into a second cache (`_conv_rates`) alongside the base cache in `_build_rate_cache`, still one lookup per unique currency per refresh.
 - **Auto-advance (`k`):** advances the highlighted sub's `next_renewal_date` by one billing cycle (`Subscription.next_renewal_after`, with month-end clamping via `_add_months` and leap-year safety) AND writes a `renewal_log` row at the *old* date. Toast confirms `name: old → new`.
-- **History screen (`h`):** `HistoryScreen` — chronological renewal log (most recent first) with a running total summed in `base_currency`. Esc returns.
+- **History screen (`h`):** `HistoryScreen` — renewal log grouped by month: a dim `YYYY-MM · BASE subtotal (count)` header precedes each month's rows, and the current month's header also shows the amortized `est BASE x/mo` so actual-so-far reads against the estimate. The title keeps the all-time running total in `base_currency`. Esc returns.
 - **Archive view (`v`):** cycles cancelled subs in/out of the visible list, dimmed throughout so they read as for-reference. Title-bar indicator `· +archive`.
 - **Trial expiry:** optional `trial_ends` field on `Subscription`. Notice panel detects trial endings in its window and emits a distinct trial-flavor post (alarmed kaomoji pool: `(((;ﾟДﾟ)))`, `(´；ω；｀)`, etc.; `"trial ends today!"` body) on the expiry day, taking priority over the regular renewal post if both fall on the same day.
 - **Notice panel (`n` cycles):**
   - **Notices state (default):** banner + 7-to-14 stacked posts (`{n} ：OL ：YYYY-MM-DD(月) ID:hash8`, body, kaomoji, `─` rule). Three pools (renewal / trial / empty) picked deterministically by `post_id` hash so the same day always renders identically. Always-JA single-char weekday labels; EN/JA bodies. Adaptive window via `_pick_window(height)`. 60-second `set_interval` tick watches for date rollover.
   - **Tutorial state:** categorized keybindings cheat sheet (Editing / Views & filters / Screens / App) in the same textboard styling. Replaces the textboard rather than blanking the column.
-- **Currency-fallback warning:** `· ⚠ rate` in the title bar when any visible sub's lookup returns `Decimal("1")` for a non-base currency. Rebuilt each refresh in `_build_rate_cache`; clears as soon as the offending sub is fixed or removed.
+- **Rate-freshness warning:** `currency.get_rate_status` classifies each lookup `fresh` / `stale` / `missing`. The title bar shows `· ⌛ stale` when a currency is using a last-known rate after a failed fetch (via `db.get_last_rate`), and `· ⚠ rate` only when a currency was never cached at all (true `Decimal("1")` fallback). Tracked as `_stale_currencies` / `_missing_currencies`, rebuilt each refresh in `_build_rate_cache`. A genuine 1.0 fetched today reads as fresh, not flagged.
 - **i18n:** full EN+JA bundle covering all surfaces. Always-JA weekday labels are intentional flavor (textboard authenticity).
 - **CLI (Phase 5):** `python -m gakkari --notice` reads the DB and prints today's renewals + a 7-day preview to stdout, then exits. Designed to be called from Windows Task Scheduler on login. `--lang en|ja` overrides the saved UI language. `sys.stdout.reconfigure(encoding="utf-8")` keeps the JA banner and kaomoji from crashing the legacy Console Host. Task Scheduler recipe lives in [docs/scheduler.md](docs/scheduler.md).
 
@@ -201,6 +208,17 @@ A trio of guards around the two "your data is precious, there's no cloud" risks 
 - **Undo last `k` (`u`):** single-level, session-scoped. `action_advance_renewal` stashes `(sub_id, old_date, new_date, log_id)`; `u` (`action_undo_advance`) restores the date (only if it hasn't changed since) and deletes that one `renewal_log` row via `db.delete_renewal`. The ledger stays append-only *except* for this explicit undo of the row you just created. The stash is overwritten on each `k` and consumed on use, so undo only ever targets the genuinely-last advance.
 - **Daily DB backup:** `db.backup_db()` runs inside `init_db()`, so both the TUI and the `--notice` CLI trigger it. Once-per-day rotating snapshot of `data/gakkari.db` → `data/backups/gakkari-YYYY-MM-DD.db` via SQLite's online backup API (WAL-safe, not a file copy), keeping the newest `BACKUP_KEEP` (7). Best-effort: it never raises and never blocks launch (skips cleanly on first run when there's no DB yet).
 - **Import validation + de-dup guard:** `io._row_to_sub` rejects out-of-domain `billing_period` / `status` / `tax_mode`, non-3-letter currencies, and negative amounts (raised as per-row `ValueError`s the importer already collects, so one bad row no longer imports silently or aborts the file). `action_import_subs` counts likely duplicates (`name`+`amount`+`currency`) against the loaded set and routes through `ConfirmModal` before inserting — a repeat import can't silently double rows.
+
+### 0.4.0 deltas — data, insight & testability
+
+- **Two new totals modes** (see Totals cycle above): `by_category` and `forecast`. The whole money/sort layer was lifted into **`gakkari/totals.py`** as pure functions `(subs, rate_cache, display_mode)` — `MainScreen` delegates, and the functions are unit-tested.
+- **Month-grouped history** with per-month subtotals + the current month's actual-vs-estimate line (see History screen above).
+- **Duplicate a subscription (`D` = Shift+D):** clones the highlighted sub (`dataclasses.replace(sub, id=None, name="… (copy)")`) into a prefilled `SubscriptionModal`, inserting on save. Lowercase `d` stays Delete.
+- **`payment_method` field on `Subscription`:** optional funding source. Additive column + migration, full CRUD/io round-trip, an optional modal field, shown on the row's category line when set, and matched by the `/` filter.
+- **Budget warning:** when `monthly_income` is set and amortized commitment exceeds it, the notice board shows a calm `▲ BASE x over budget (n%)` line under the banner, regardless of the active totals mode. `_build_rate_cache` now caches the income rate whenever income is set (not only in income mode).
+- **Stale-rate transparency:** `get_rate_status` returns `(rate, "fresh"|"stale"|"missing")`; a failed fetch reuses the last cached rate of any age instead of a fake 1:1, collapsing to 1:1 only when nothing was ever cached.
+- **Testability + CI:** `get_conn()` honours a `GAKKARI_DB` env override (read at call-time) so tests use a temp DB; `tests/` holds the pytest suite and `.github/workflows/ci.yml` runs it + a non-UTF-8-locale CLI smoke on Python 3.12/3.13.
+- **Polish:** the UTF-8 stream guard moved to the top of `__main__.main()` so `--help` / argparse errors no longer mojibake the em-dash; the dead `SCREENS` dict and redundant `CSS_PATH` were removed from `app.py`.
 
 ---
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unicodedata
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 
@@ -21,7 +22,8 @@ from textual.widgets import (
 from textual.widgets.option_list import Option
 
 from gakkari import io as gio
-from gakkari.currency import get_rate
+from gakkari import totals
+from gakkari.currency import get_rate_status
 from gakkari.db import (
     delete_renewal,
     get_conn,
@@ -44,20 +46,14 @@ from gakkari.ui.subscription_modal import SubscriptionModal
 
 LINE_WIDTH_FALLBACK = 30
 
-# Shortest-first; controls "sort by period" grouping.
-_PERIOD_ORDER: dict[str, int] = {
-    "weekly": 0,
-    "monthly": 1,
-    "quarterly": 2,
-    "half_yearly": 3,
-    "yearly": 4,
-}
 _SORT_CYCLE: tuple[str, ...] = ("date", "period", "name", "amount")
 _TOTALS_CYCLE: tuple[str, ...] = (
     "estimate",
     "monthly_strict",
     "yearly_strict",
     "by_period",
+    "by_category",
+    "forecast",
     "income",
 )
 
@@ -80,6 +76,7 @@ class MainScreen(Screen):
         Binding("a", "add", "Add"),
         Binding("e", "edit", "Edit"),
         Binding("d", "delete", "Delete"),
+        Binding("D", "duplicate", "Duplicate"),
         Binding("k", "advance_renewal", "Kept it"),
         Binding("u", "undo_advance", "Undo"),
         Binding("right", "open_notes", "Notes", key_display="→", priority=True),
@@ -210,7 +207,8 @@ class MainScreen(Screen):
         self._filter_text: str = ""
         self._show_paused: bool = True
         self._show_cancelled: bool = False
-        self._fallback_currencies: set[str] = set()
+        self._stale_currencies: set[str] = set()
+        self._missing_currencies: set[str] = set()
         self._rate_cache: dict[str, Decimal] = {}
         # Rates keyed to the convert-column target (see _convert_target). Kept
         # separate from _rate_cache because the `c` column can target a
@@ -272,7 +270,7 @@ class MainScreen(Screen):
 
     def check_action(self, action: str, parameters: tuple) -> bool | None:
         if self._notes_active and action in (
-            "add", "edit", "delete", "open_notes", "help",
+            "add", "edit", "delete", "duplicate", "open_notes", "help",
             "toggle_notices", "focus_filter", "toggle_gross_net",
             "toggle_paused", "settings", "export", "import_subs",
             "cycle_sort", "cycle_totals", "toggle_convert", "advance_renewal",
@@ -305,6 +303,7 @@ class MainScreen(Screen):
                 not needle
                 or needle in s.name.lower()
                 or needle in s.category.lower()
+                or needle in s.payment_method.lower()
             )
         ]
         # Fetch all rates we'll need this pass once, then hand the dict to
@@ -334,60 +333,47 @@ class MainScreen(Screen):
         base_needed = {s.currency for s in subs if s.currency and s.currency != base}
         # Income mode converts the income into base, so its currency needs a
         # rate in the base cache too.
+        # Cache the income currency's rate whenever income is set — both the
+        # income totals mode and the notice-panel budget warning need it.
         income_ccy = self._income_target()
-        if (
-            self._settings.totals_view_mode == "income"
-            and self._settings.monthly_income > 0
-            and income_ccy != base
-        ):
+        if self._settings.monthly_income > 0 and income_ccy != base:
             base_needed.add(income_ccy)
         conv_needed = (
             {s.currency for s in subs if s.currency and s.currency != target}
             if want_conv else set()
         )
-        fallback: set[str] = set()
+        stale: set[str] = set()
+        missing: set[str] = set()
         if base_needed or conv_needed:
             with get_conn() as conn:
                 for cur in base_needed:
-                    r = get_rate(conn, cur, base)
-                    if r == Decimal("1") and cur != base:
-                        fallback.add(cur)
+                    r, status = get_rate_status(conn, cur, base)
                     rates[cur] = r
+                    if status == "stale":
+                        stale.add(cur)
+                    elif status == "missing":
+                        missing.add(cur)
                 for cur in conv_needed:
-                    r = get_rate(conn, cur, target)
-                    if r == Decimal("1") and cur != target:
-                        fallback.add(cur)
+                    r, status = get_rate_status(conn, cur, target)
                     conv[cur] = r
-        self._fallback_currencies = fallback
+                    if status == "stale":
+                        stale.add(cur)
+                    elif status == "missing":
+                        missing.add(cur)
+        self._stale_currencies = stale
+        self._missing_currencies = missing
         # When the target is base, the base cache already has every rate the
         # column needs — point at it rather than keep a duplicate.
         self._conv_rates = conv if want_conv else rates
         return rates
 
     def _sort_subs(self, subs: list[Subscription]) -> list[Subscription]:
-        mode = self._settings.sort_mode
-        if mode == "period":
-            return sorted(
-                subs,
-                key=lambda s: (
-                    _PERIOD_ORDER.get(s.billing_period, 99),
-                    s.next_renewal_date,
-                ),
-            )
-        if mode == "name":
-            return sorted(subs, key=lambda s: s.name.lower())
-        if mode == "amount":
-            # Compare in base currency × monthly-equivalent — only meaningful
-            # cross-currency ordering. Highest-cost first matches the
-            # "what's burning my money" reading order.
-            disp = self._settings.price_display_mode
-            return sorted(
-                subs,
-                key=lambda s: s.monthly_equivalent(disp)
-                * self._rate_cache.get(s.currency, Decimal("1")),
-                reverse=True,
-            )
-        return sorted(subs, key=lambda s: s.next_renewal_date)
+        return totals.sort_subs(
+            subs,
+            self._settings.sort_mode,
+            self._rate_cache,
+            self._settings.price_display_mode,
+        )
 
     def _line_width(self) -> int:
         try:
@@ -430,13 +416,16 @@ class MainScreen(Screen):
                 f" · {t('indicator_conv', lang).format(target=self._convert_target())}"
             )
         if not self._subs:
-            self._fallback_currencies = set()
+            self._stale_currencies = set()
+            self._missing_currencies = set()
             title.update(f"がっかりOL{indicators}")
             return
         count = len(self._subs)
         warning = ""
-        if self._fallback_currencies:
-            warning = f" · ⚠ {t('rate_fallback_warning', lang)}"
+        if self._missing_currencies:
+            warning += f" · ⚠ {t('rate_fallback_warning', lang)}"
+        if self._stale_currencies:
+            warning += f" · ⌛ {t('rate_stale_warning', lang)}"
         totals_str = self._format_totals(self._subs, base, lang)
         title.update(
             f"がっかりOL{indicators}  "
@@ -466,6 +455,31 @@ class MainScreen(Screen):
                 for p, amt in breakdown
             ]
             return " · ".join(parts)
+        if mode == "by_category":
+            breakdown = totals.totals_by_category(
+                subs, self._rate_cache, self._settings.price_display_mode
+            )
+            if not breakdown:
+                return f"{base} 0 · {t('totals_mode_by_category', lang)}"
+            cap = 5
+            parts = [
+                f"{(fmt_category(cat, lang) if cat else '—')} {base} {amt:,.0f}"
+                for cat, amt in breakdown[:cap]
+            ]
+            if len(breakdown) > cap:
+                parts.append(
+                    t("notice_plus_n_more", lang).format(n=len(breakdown) - cap)
+                )
+            return " · ".join(parts)
+        if mode == "forecast":
+            buckets = totals.cashout_forecast(
+                subs, self._rate_cache, self._settings.price_display_mode, date.today()
+            )
+            parts = [
+                f"{base} {amt:,.0f} {t('forecast_within', lang).format(d=h)}"
+                for h, amt in buckets
+            ]
+            return f"{' · '.join(parts)} · {t('totals_mode_forecast', lang)}"
         if mode == "income":
             return self._format_income(subs, base, lang)
         # estimate (default): existing monthly+yearly normalized pair
@@ -514,45 +528,21 @@ class MainScreen(Screen):
         )
 
     def _total_monthly_in_base(self, subs: list[Subscription]) -> Decimal:
-        """Normalized monthly total — all periods folded to monthly equivalent."""
-        active = [s for s in subs if s.status == "active"]
-        if not active:
-            return Decimal("0")
-        mode = self._settings.price_display_mode
-        total = Decimal("0")
-        for sub in active:
-            rate = self._rate_cache.get(sub.currency, Decimal("1"))
-            total += sub.monthly_equivalent(mode) * rate
-        return total
+        return totals.total_monthly_in_base(
+            subs, self._rate_cache, self._settings.price_display_mode
+        )
 
     def _total_strict(self, subs: list[Subscription], period: str) -> Decimal:
-        """Sum of active subs whose actual billing_period matches `period`."""
-        mode = self._settings.price_display_mode
-        total = Decimal("0")
-        for sub in subs:
-            if sub.status != "active" or sub.billing_period != period:
-                continue
-            rate = self._rate_cache.get(sub.currency, Decimal("1"))
-            total += sub.display_amount(mode) * rate
-        return total
+        return totals.total_strict(
+            subs, period, self._rate_cache, self._settings.price_display_mode
+        )
 
     def _totals_by_period(
         self, subs: list[Subscription]
     ) -> list[tuple[str, Decimal]]:
-        """Per-period subtotals in `_PERIOD_ORDER` order (only non-empty periods)."""
-        mode = self._settings.price_display_mode
-        bucket: dict[str, Decimal] = {}
-        for sub in subs:
-            if sub.status != "active":
-                continue
-            rate = self._rate_cache.get(sub.currency, Decimal("1"))
-            amt = sub.display_amount(mode) * rate
-            bucket[sub.billing_period] = bucket.get(sub.billing_period, Decimal("0")) + amt
-        ordered = sorted(
-            bucket.items(),
-            key=lambda kv: _PERIOD_ORDER.get(kv[0], 99),
+        return totals.totals_by_period(
+            subs, self._rate_cache, self._settings.price_display_mode
         )
-        return ordered
 
     def _render_entry(self, sub: Subscription) -> Text:
         w = self._line_width()
@@ -607,6 +597,8 @@ class MainScreen(Screen):
         text.append("\n")
 
         cat_str = fmt_category(sub.category, self._lang) if sub.category else "—"
+        if sub.payment_method:
+            cat_str += f" · {sub.payment_method}"
         status_str = fmt_status(sub.status, self._lang)
         pad3 = max(1, w - _disp_width(cat_str) - _disp_width(status_str))
         text.append(cat_str, style="#554400")
@@ -661,6 +653,31 @@ class MainScreen(Screen):
                 option_list.highlighted = min(
                     prev_idx or 0, len(self._subs) - 1
                 )
+
+    @work
+    async def action_duplicate(self) -> None:
+        sub = self._current_sub()
+        if sub is None:
+            return
+        # Clone with no id (so it inserts) and a "(copy)" name; the prefilled
+        # modal lets the user tweak only what differs.
+        clone = replace(
+            sub,
+            id=None,
+            name=f"{sub.name} {t('duplicate_suffix', self._lang)}",
+        )
+        result = await self.app.push_screen_wait(
+            SubscriptionModal(sub=clone, lang=self._lang)
+        )
+        if result is not None:
+            with get_conn() as conn:
+                new_id = insert_subscription(conn, result)
+            self._load_subs()
+            option_list = self.query_one("#list-view", OptionList)
+            for i, s in enumerate(self._subs):
+                if s.id == new_id:
+                    option_list.highlighted = i
+                    break
 
     def action_advance_renewal(self) -> None:
         sub = self._current_sub()
@@ -983,6 +1000,29 @@ class MainScreen(Screen):
         self._refresh_view()
         self._refresh_notice_panel()
 
+    def _budget_warning(self) -> str:
+        """One-line over-budget summary for the notice board, or "" when income
+        is unset or commitment is within budget. Uses the same committed-vs-
+        income math as the income totals mode."""
+        income = self._settings.monthly_income
+        if income <= 0:
+            return ""
+        income_base = income * self._rate_cache.get(
+            self._income_target(), Decimal("1")
+        )
+        if income_base <= 0:
+            return ""
+        committed = self._total_monthly_in_base(self._subs)
+        if committed <= income_base:
+            return ""
+        over = committed - income_base
+        pct = committed / income_base * 100
+        return t("budget_over", self._lang).format(
+            base=self._settings.base_currency,
+            over=f"{over:,.2f}",
+            pct=f"{pct:.0f}",
+        )
+
     def _refresh_notice_panel(self) -> None:
         try:
             panel = self.query_one("#right-panel", NoticePanel)
@@ -1004,6 +1044,7 @@ class MainScreen(Screen):
             self._notices_enabled,
             width,
             height,
+            budget_warning=self._budget_warning(),
         )
 
     # ── Misc ────────────────────────────────────────────────────────────

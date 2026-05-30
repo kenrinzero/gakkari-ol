@@ -114,6 +114,9 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
             yield Label(t("field_category", lang), classes="field-label")
             yield Input(placeholder="Tools", id="category")
 
+            yield Label(t("field_payment_method", lang), classes="field-label")
+            yield Input(placeholder="Visa …1234", id="payment_method")
+
             yield Label(t("field_notes", lang), classes="field-label")
             yield Input(placeholder="", id="notes")
 
@@ -143,6 +146,7 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
         self.query_one("#period", Select).value = s.billing_period
         self.query_one("#next_renewal", Input).value = s.next_renewal_date.isoformat()
         self.query_one("#category", Input).value = s.category
+        self.query_one("#payment_method", Input).value = s.payment_method
         self.query_one("#notes", Input).value = s.notes
         self.query_one("#tax_mode", Select).value = s.tax_mode
         self.query_one("#tax_rate", Input).value = str(s.tax_rate)
@@ -202,6 +206,7 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
             next_renewal = None
 
         category = self.query_one("#category", Input).value.strip()
+        payment_method = self.query_one("#payment_method", Input).value.strip()
         notes = self.query_one("#notes", Input).value
 
         tax_mode = self.query_one("#tax_mode", Select).value
@@ -251,6 +256,7 @@ class SubscriptionModal(ModalScreen[Subscription | None]):
             tax_rate=tax_rate,
             status=status,
             trial_ends=trial_ends,
+            payment_method=payment_method,
             id=self._sub.id if self._sub else None,
         )
         self.dismiss(sub)

@@ -31,6 +31,7 @@ class NoticePanel(Static):
         enabled: bool,
         width: int,
         height: int = 0,
+        budget_warning: str = "",
     ) -> None:
         width = max(20, width)  # narrow-terminal floor; below this it'll just crop
         if not enabled:
@@ -42,12 +43,21 @@ class NoticePanel(Static):
         posts = build_notice_posts(subs, today, lang, window=window)
         banner = self._banner(lang, width)
         rendered = [banner]
+        if budget_warning:
+            rendered.append(self._budget_line(budget_warning, width))
         for post in posts:
             rendered.append(self._render_post(post, width))
         rendered.append(self._end_marker(width))
         # Wrap the Group in a no_wrap-safe container by using Text on each
         # already-Text piece; rich Group preserves their wrapping settings.
         self.update(Group(*rendered))
+
+    def _budget_line(self, text: str, width: int) -> Group:
+        """Calm over-budget banner shown just under the thread title (only when
+        the parent supplies one). Amber, not red — a heads-up, not an alarm."""
+        line = Text(text, style="bold #FF8C00", justify="center")
+        line.truncate(width, overflow="ellipsis")
+        return Group(line, Text(""))
 
     # ── internal ──────────────────────────────────────────────────────
 
@@ -99,6 +109,7 @@ class NoticePanel(Static):
                 ("a", "bind_add"),
                 ("e", "bind_edit"),
                 ("d", "bind_delete"),
+                ("D", "bind_duplicate"),
                 ("k", "bind_advance"),
                 ("u", "bind_undo"),
                 ("→", "bind_notes"),
@@ -121,6 +132,8 @@ class NoticePanel(Static):
                 ("x", "bind_export"),
                 ("i", "bind_import"),
                 ("l", "bind_lang"),
+                ("?", "bind_help"),
+                ("Esc", "bind_back"),
                 ("q", "bind_quit"),
             )),
         )
