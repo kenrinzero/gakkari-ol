@@ -198,10 +198,10 @@ a:hover, a:focus {
 }
 footer {
   max-width: 84ch; margin: 4rem auto 0; text-align: center;
-  color: var(--amber-dimmer); font-size: 0.85em; letter-spacing: 0.15em;
+  color: var(--amber-dimmer); font-size: 1em; letter-spacing: 0.15em;
 }
 footer p { margin: 0.5rem 0; }
-footer .dim { color: var(--amber-faint); font-size: 0.85em; letter-spacing: 0.1em; }
+footer .dim { color: var(--amber-dimmer); font-size: 0.95em; letter-spacing: 0.1em; }
 @media (max-width: 720px) {
   body { padding: 1.5rem 0.75rem 3rem; font-size: 19px; }
   .hero { grid-template-columns: 1fr; gap: 1.5rem; text-align: center; padding: 1rem 0 2rem; }
@@ -221,11 +221,23 @@ footer .dim { color: var(--amber-faint); font-size: 0.85em; letter-spacing: 0.1e
 @media (prefers-reduced-motion: reduce) {
   .cursor, .flicker { animation: none; }
 }
+#lang-toggle {
+  position: fixed; top: 0.75rem; right: 0.75rem; z-index: 1001;
+  background: var(--bg-soft); color: var(--amber-bright);
+  border: 1px solid var(--amber-dim); padding: 0.3rem 0.75rem;
+  font-family: inherit; font-size: 0.8em; font-weight: 700; cursor: pointer;
+  letter-spacing: 0.1em; text-shadow: var(--glow-soft);
+  transition: background-color 0.15s, color 0.15s;
+}
+#lang-toggle:hover, #lang-toggle:focus {
+  background: var(--amber-bright); color: var(--bg); text-shadow: none; outline: none;
+}
 </style>
 </head>
 <body>
 <div class="scanlines" aria-hidden="true"></div>
 <div class="flicker" aria-hidden="true"></div>
+<button id="lang-toggle" type="button" aria-label="Switch language">日本語</button>
 
 <header class="boot">
   <span class="prompt">C:\GAKKARI&gt;</span>
@@ -277,65 +289,65 @@ footer .dim { color: var(--amber-faint); font-size: 0.85em; letter-spacing: 0.1e
   <div class="title-block">
     <h1>がっかり OL</h1>
     <p class="kana">gakkari OL</p>
-    <p class="tag">the small sigh you make when you check your monthly subscriptions.</p>
-    <p class="meta">Python · Textual TUI · SQLite · local-only · no cloud · no telemetry</p>
+    <p class="tag" data-i18n="hero.tag">the small sigh you make when you check your monthly subscriptions.</p>
+    <p class="meta" data-i18n="hero.meta">Python · Textual TUI · SQLite · local-only · no cloud · no telemetry</p>
     <p class="cta">
-      <a class="btn" href="#install">→ install</a>
+      <a class="btn" href="#install" data-i18n="cta.install">→ install</a>
       <a class="btn ghost" href="https://github.com/kenrinzero/gakkari-ol">github</a>
     </p>
   </div>
 </section>
 
 <section class="panel" id="about">
-  <h2>about</h2>
-  <p>
+  <h2 data-i18n="h2.about">about</h2>
+  <p data-i18n="about.p1">
     <em>がっかり</em> (gakkari) — “disappointed / let down.”
     <em>OL</em> — Office Lady. The small sigh of opening your bank app and seeing the monthly total.
   </p>
-  <p>
+  <p data-i18n="about.p2">
     Gakkari OL is a calm terminal subscription tracker. It runs locally, stores everything in a single SQLite file next to the code, and reminds you what renews this week in the visual idiom of a Japanese textboard.
   </p>
-  <p>
+  <p data-i18n="about.p3">
     No accounts. No cloud sync. No telemetry. No gamification.
   </p>
 </section>
 
 <section class="panel" id="install">
-  <h2>install</h2>
-  <p>Requires Python 3.12 or newer.</p>
+  <h2 data-i18n="h2.install">install</h2>
+  <p data-i18n="install.req">Requires Python 3.12 or newer.</p>
   <div class="install-box">
     <code class="cmd" id="install-cmd">pip install git+https://github.com/kenrinzero/gakkari-ol</code>
     <button class="copy" data-target="install-cmd">copy</button>
   </div>
-  <p>Then launch:</p>
+  <p data-i18n="install.launch">Then launch:</p>
   <pre class="cmd-run">$ python -m gakkari</pre>
-  <p class="hint">Once installed, the <code>gakkari</code> console script also works (<code>.venv\Scripts\gakkari.exe</code> on Windows).</p>
+  <p class="hint" data-i18n="install.hint">Once installed, the <code>gakkari</code> console script also works (<code>.venv\Scripts\gakkari.exe</code> on Windows).</p>
 </section>
 
 <section class="panel" id="features">
-  <h2>features</h2>
+  <h2 data-i18n="h2.features">features</h2>
   <ul class="features">
-    <li><b>CRUD with soft-delete</b> — subs are never hard-deleted; cancelled is the terminal state.</li>
-    <li><b>Multi-currency totals</b> — ECB rates from <a href="https://frankfurter.dev/">frankfurter.dev</a>, cached daily.</li>
-    <li><b>Gross / net VAT modes</b>, per-row tax mode + rate.</li>
-    <li><b>Adaptive notice board</b> — 1 to 2 week rolling textboard window. Trial-expiry warnings with louder kaomoji.</li>
-    <li><b>Auto-advance (<kbd>k</kbd>) + undo (<kbd>u</kbd>)</b> — one keystroke advances a renewal and logs it to a local ledger; <kbd>u</kbd> reverses the last one.</li>
-    <li><b>History view (<kbd>h</kbd>)</b> — renewal log grouped by month with subtotals; the current month shows actual vs. your estimate.</li>
-    <li><b>Archive view (<kbd>v</kbd>) + resume (<kbd>r</kbd>)</b> — surface cancelled subs dimmed for reference; <kbd>r</kbd> resumes the highlighted one.</li>
-    <li><b>Conversion column (<kbd>c</kbd>)</b> — show each row converted to your base (or any chosen) currency next to its native price.</li>
-    <li><b>Duplicate (<kbd>D</kbd>) &amp; payment-method tags</b> — clone a sub into a prefilled form; tag which card it's on, and filter by it.</li>
-    <li><b>Budget watch</b> — set a monthly income; the notice board flags when committed spend goes over.</li>
-    <li><b>Safe by default</b> — rotating daily DB backup, import validation + duplicate-guard, Decimal-precise money.</li>
-    <li><b>Sort &amp; totals cycles</b> — date / period / name / amount; estimate / monthly / yearly / by-period / <b>by-category</b> / <b>30·60·90-day forecast</b> / income.</li>
-    <li><b>CSV &amp; JSON import / export</b>, full EN / JA bilingual UI.</li>
-    <li><b>Daily <code>--notice</code> CLI</b> for Windows Task Scheduler, cron, login scripts.</li>
+    <li data-i18n="feat.crud"><b>CRUD with soft-delete</b> — subs are never hard-deleted; cancelled is the terminal state.</li>
+    <li data-i18n="feat.multicur"><b>Multi-currency totals</b> — ECB rates from <a href="https://frankfurter.dev/">frankfurter.dev</a>, cached daily.</li>
+    <li data-i18n="feat.vat"><b>Gross / net VAT modes</b>, per-row tax mode + rate.</li>
+    <li data-i18n="feat.notice"><b>Adaptive notice board</b> — 1 to 2 week rolling textboard window. Trial-expiry warnings with louder kaomoji.</li>
+    <li data-i18n="feat.advance"><b>Auto-advance (<kbd>k</kbd>) + undo (<kbd>u</kbd>)</b> — one keystroke advances a renewal and logs it to a local ledger; <kbd>u</kbd> reverses the last one.</li>
+    <li data-i18n="feat.history"><b>History view (<kbd>h</kbd>)</b> — renewal log grouped by month with subtotals; the current month shows actual vs. your estimate.</li>
+    <li data-i18n="feat.archive"><b>Archive view (<kbd>v</kbd>) + resume (<kbd>r</kbd>)</b> — surface cancelled subs dimmed for reference; <kbd>r</kbd> resumes the highlighted one.</li>
+    <li data-i18n="feat.convert"><b>Conversion column (<kbd>c</kbd>)</b> — show each row converted to your base (or any chosen) currency next to its native price.</li>
+    <li data-i18n="feat.duplicate"><b>Duplicate (<kbd>D</kbd>) &amp; payment-method tags</b> — clone a sub into a prefilled form; tag which card it's on, and filter by it.</li>
+    <li data-i18n="feat.budget"><b>Budget watch</b> — set a monthly income; the notice board flags when committed spend goes over.</li>
+    <li data-i18n="feat.safe"><b>Safe by default</b> — rotating daily DB backup, import validation + duplicate-guard, Decimal-precise money.</li>
+    <li data-i18n="feat.cycles"><b>Sort &amp; totals cycles</b> — date / period / name / amount; estimate / monthly / yearly / by-period / <b>by-category</b> / <b>30·60·90-day forecast</b> / income.</li>
+    <li data-i18n="feat.io"><b>CSV &amp; JSON import / export</b>, full EN / JA bilingual UI.</li>
+    <li data-i18n="feat.cli"><b>Daily <code>--notice</code> CLI</b> for Windows Task Scheduler, cron, login scripts.</li>
   </ul>
 </section>
 
 <section class="panel" id="preview">
-  <h2>preview</h2>
-  <p>This is the notice panel for an active install — adaptive textboard with renewal posts, trial warnings, deterministic kaomoji per day.</p>
-  <pre class="textboard">────────────────────────────────────────
+  <h2 data-i18n="h2.preview">preview</h2>
+  <p data-i18n="preview.p">This is the notice panel for an active install — adaptive textboard with renewal posts, trial warnings, deterministic kaomoji per day.</p>
+  <pre class="textboard" data-i18n="preview.board">────────────────────────────────────────
             Upcoming renewals
 ────────────────────────────────────────
 
@@ -365,54 +377,57 @@ NewApp Beta trial ends today!
 </section>
 
 <section class="panel" id="keys">
-  <h2>keybindings</h2>
+  <h2 data-i18n="h2.keys">keybindings</h2>
   <div class="key-grid">
     <div class="key-group">
-      <h3>Editing</h3>
+      <h3 data-i18n="keys.editing">Editing</h3>
       <dl class="kbd">
-        <dt><kbd>a</kbd></dt><dd>Add</dd>
-        <dt><kbd>e</kbd></dt><dd>Edit</dd>
-        <dt><kbd>d</kbd></dt><dd>Delete (cancel)</dd>
-        <dt><kbd>k</kbd></dt><dd>Kept it · advance &amp; log</dd>
-        <dt><kbd>→</kbd></dt><dd>Notes</dd>
+        <dt><kbd>a</kbd></dt><dd data-i18n="key.add">Add</dd>
+        <dt><kbd>e</kbd></dt><dd data-i18n="key.edit">Edit</dd>
+        <dt><kbd>d</kbd></dt><dd data-i18n="key.delete">Delete (cancel)</dd>
+        <dt><kbd>D</kbd></dt><dd data-i18n="key.duplicate">Duplicate</dd>
+        <dt><kbd>k</kbd></dt><dd data-i18n="key.advance">Kept it · advance &amp; log</dd>
+        <dt><kbd>u</kbd></dt><dd data-i18n="key.undo">Undo last <kbd>k</kbd></dd>
+        <dt><kbd>→</kbd></dt><dd data-i18n="key.notes">Notes</dd>
       </dl>
     </div>
     <div class="key-group">
-      <h3>Views</h3>
+      <h3 data-i18n="keys.views">Views</h3>
       <dl class="kbd">
-        <dt><kbd>/</kbd></dt><dd>Filter</dd>
-        <dt><kbd>g</kbd></dt><dd>Gross / Net</dd>
-        <dt><kbd>p</kbd></dt><dd>Paused</dd>
-        <dt><kbd>v</kbd></dt><dd>Archive</dd>
-        <dt><kbd>o</kbd></dt><dd>Sort cycle</dd>
-        <dt><kbd>t</kbd></dt><dd>Totals cycle</dd>
-        <dt><kbd>c</kbd></dt><dd>Convert column</dd>
+        <dt><kbd>/</kbd></dt><dd data-i18n="key.filter">Filter</dd>
+        <dt><kbd>g</kbd></dt><dd data-i18n="key.grossnet">Gross / Net</dd>
+        <dt><kbd>p</kbd></dt><dd data-i18n="key.paused">Paused</dd>
+        <dt><kbd>v</kbd></dt><dd data-i18n="key.archive">Archive</dd>
+        <dt><kbd>r</kbd></dt><dd data-i18n="key.resume">Resume (un-cancel)</dd>
+        <dt><kbd>o</kbd></dt><dd data-i18n="key.sort">Sort cycle</dd>
+        <dt><kbd>t</kbd></dt><dd data-i18n="key.totals">Totals cycle</dd>
+        <dt><kbd>c</kbd></dt><dd data-i18n="key.convert">Convert column</dd>
       </dl>
     </div>
     <div class="key-group">
-      <h3>Screens</h3>
+      <h3 data-i18n="keys.screens">Screens</h3>
       <dl class="kbd">
-        <dt><kbd>h</kbd></dt><dd>History</dd>
-        <dt><kbd>n</kbd></dt><dd>Notices ↔ Tutorial</dd>
+        <dt><kbd>h</kbd></dt><dd data-i18n="key.history">History</dd>
+        <dt><kbd>n</kbd></dt><dd data-i18n="key.notices">Notices ↔ Tutorial</dd>
       </dl>
     </div>
     <div class="key-group">
-      <h3>App</h3>
+      <h3 data-i18n="keys.app">App</h3>
       <dl class="kbd">
-        <dt><kbd>s</kbd></dt><dd>Settings</dd>
-        <dt><kbd>x</kbd></dt><dd>Export</dd>
-        <dt><kbd>i</kbd></dt><dd>Import</dd>
-        <dt><kbd>l</kbd></dt><dd>Language</dd>
-        <dt><kbd>q</kbd></dt><dd>Quit</dd>
-        <dt><kbd>?</kbd></dt><dd>Help</dd>
+        <dt><kbd>s</kbd></dt><dd data-i18n="key.settings">Settings</dd>
+        <dt><kbd>x</kbd></dt><dd data-i18n="key.export">Export</dd>
+        <dt><kbd>i</kbd></dt><dd data-i18n="key.import">Import</dd>
+        <dt><kbd>l</kbd></dt><dd data-i18n="key.language">Language</dd>
+        <dt><kbd>q</kbd></dt><dd data-i18n="key.quit">Quit</dd>
+        <dt><kbd>?</kbd></dt><dd data-i18n="key.help">Help</dd>
       </dl>
     </div>
   </div>
 </section>
 
 <section class="panel" id="cli">
-  <h2>daily notice</h2>
-  <p>
+  <h2 data-i18n="h2.cli">daily notice</h2>
+  <p data-i18n="cli.p">
     <code>python -m gakkari --notice</code> reads the database and prints today’s renewals plus a 7-day preview, then exits. Wire it into Windows Task Scheduler (or cron, or login scripts) and you’ll see what renews this week before you open anything else.
   </p>
   <pre class="cmd-run">[Gakkari OL] Upcoming renewals — 2026-05-12 (火)
@@ -424,28 +439,28 @@ NewApp Beta trial ends today!
 Upcoming (next 7 days):
   +2d 2026-05-14 (木)  Netflix  USD 15.49
   +5d 2026-05-17 (日)  Domain   USD 12.00</pre>
-  <p><a href="https://github.com/kenrinzero/gakkari-ol/blob/main/docs/scheduler.md">Windows Task Scheduler recipe →</a></p>
+  <p data-i18n="cli.recipe"><a href="https://github.com/kenrinzero/gakkari-ol/blob/main/docs/scheduler.md">Windows Task Scheduler recipe →</a></p>
 </section>
 
 <section class="panel" id="credits">
-  <h2>credits</h2>
-  <p>Built collaboratively with several AI models, each contributing a distinct stage:</p>
+  <h2 data-i18n="h2.credits">credits</h2>
+  <p data-i18n="credits.intro">Built collaboratively with several AI models, each contributing a distinct stage:</p>
   <ul class="credits">
-    <li><b>Mistral Large 2</b> — original concept</li>
-    <li><b>Grok Imagine</b> — mascot character design</li>
-    <li><b>Claude Sonnet 4.7</b> — initial scaffold and visual style</li>
-    <li><b>Claude Opus 4.6</b> — feature implementation (Phases 1–4)</li>
-    <li><b>Claude Opus 4.7</b> — Phases 5–6: CLI, restructure, history screen, ledger, archive, trial expiry, sort/totals/convert cycles, adaptive notice window, tutorial alt-state</li>
-    <li><b>Claude Opus 4.8</b> — convert-column currency (decoupled from base), income totals mode, and the 0.4.0 round: spending insights (by-category / cash-out forecast / month-grouped history), undo + daily backups + import guards, payment-method field, first test suite + CI</li>
+    <li data-i18n="cr.mistral"><b>Mistral Large 2</b> — original concept</li>
+    <li data-i18n="cr.grok"><b>Grok Imagine</b> — mascot character design</li>
+    <li data-i18n="cr.sonnet"><b>Claude Sonnet 4.7</b> — initial scaffold and visual style</li>
+    <li data-i18n="cr.opus46"><b>Claude Opus 4.6</b> — feature implementation (Phases 1–4)</li>
+    <li data-i18n="cr.opus47"><b>Claude Opus 4.7</b> — Phases 5–6: CLI, restructure, history screen, ledger, archive, trial expiry, sort/totals/convert cycles, adaptive notice window, tutorial alt-state</li>
+    <li data-i18n="cr.opus48"><b>Claude Opus 4.8</b> — convert-column currency (decoupled from base), income totals mode, and the 0.4.0 round: spending insights (by-category / cash-out forecast / month-grouped history), undo + daily backups + import guards, payment-method field, first test suite + CI</li>
   </ul>
-  <p>MIT licensed. Source on <a href="https://github.com/kenrinzero/gakkari-ol">GitHub</a>.</p>
+  <p data-i18n="credits.license">MIT licensed. Source on <a href="https://github.com/kenrinzero/gakkari-ol">GitHub</a>.</p>
 </section>
 
 </main>
 
 <footer>
   <p>〜 終 〜</p>
-  <p class="dim">no telemetry · no analytics · this page sets no cookies</p>
+  <p class="dim" data-i18n="footer.dim">no telemetry · no analytics · this page sets no cookies</p>
 </footer>
 
 <script>
@@ -467,6 +482,145 @@ Upcoming (next 7 days):
       });
     });
   });
+</script>
+
+<script>
+  /* Bilingual landing page. The markup is the EN source of truth; we snapshot
+   * each [data-i18n] element's EN innerHTML on load and swap to JA on toggle.
+   * Choice persists in localStorage and first-visit defaults to navigator.language. */
+  (function () {
+    var JA = {
+      "hero.tag": "毎月のサブスクを確認したときに漏れる、小さなため息。",
+      "hero.meta": "Python · Textual TUI · SQLite · ローカル専用 · クラウドなし · テレメトリなし",
+      "cta.install": "→ インストール",
+
+      "h2.about": "概要",
+      "about.p1": "<em>がっかり</em>(gakkari)— 「失望・気落ち」。<em>OL</em> — オフィスレディ。銀行アプリを開いて月の合計を見たときの、小さなため息。",
+      "about.p2": "がっかり OL は穏やかなターミナル用サブスク管理ツール。すべてローカルで動作し、コードの隣にある単一の SQLite ファイルに保存して、今週更新されるものを日本のテキストボード風に知らせます。",
+      "about.p3": "アカウントなし。クラウド同期なし。テレメトリなし。ゲーム要素なし。",
+
+      "h2.install": "インストール",
+      "install.req": "Python 3.12 以降が必要です。",
+      "install.launch": "そして起動:",
+      "install.hint": "インストール後は <code>gakkari</code> コマンドでも起動できます(Windows では <code>.venv\\Scripts\\gakkari.exe</code>)。",
+
+      "h2.features": "機能",
+      "feat.crud": "<b>論理削除つき CRUD</b> — サブスクは物理削除されず、「解約済み」が終端状態。",
+      "feat.multicur": "<b>多通貨の合計</b> — <a href=\"https://frankfurter.dev/\">frankfurter.dev</a> の ECB レートを毎日キャッシュ。",
+      "feat.vat": "<b>税込/税抜モード</b>、行ごとの税区分・税率。",
+      "feat.notice": "<b>適応型ノティスボード</b> — 1〜2週間のローリング表示。体験版終了の警告は強めの顔文字で。",
+      "feat.advance": "<b>更新済み(<kbd>k</kbd>)+取り消し(<kbd>u</kbd>)</b> — 1キーで更新日を1周期進めローカル台帳に記録。<kbd>u</kbd> で直前を取り消し。",
+      "feat.history": "<b>履歴(<kbd>h</kbd>)</b> — 更新ログを月ごとに小計表示。今月は実績と概算を並べて確認。",
+      "feat.archive": "<b>アーカイブ(<kbd>v</kbd>)+再開(<kbd>r</kbd>)</b> — 解約済みを淡色で参照表示。<kbd>r</kbd> でハイライト中を再開。",
+      "feat.convert": "<b>換算カラム(<kbd>c</kbd>)</b> — 各行を基準(または任意)通貨に換算し、元の価格の隣に表示。",
+      "feat.duplicate": "<b>複製(<kbd>D</kbd>)・支払い方法タグ</b> — 入力済みフォームに複製。どのカードかをタグ付けして絞り込み可能。",
+      "feat.budget": "<b>予算ウォッチ</b> — 月収を設定すると、確定支出が超過したときノティスボードが知らせます。",
+      "feat.safe": "<b>はじめから安全</b> — DB の日次ローテーションバックアップ、インポート検証+重複ガード、金額は常に Decimal。",
+      "feat.cycles": "<b>並べ替え・合計サイクル</b> — 日付/周期/名前/金額、概算/月次/年次/周期別/<b>種別別</b>/<b>30・60・90日予測</b>/収入。",
+      "feat.io": "<b>CSV・JSON の入出力</b>、完全な EN/JA バイリンガル UI。",
+      "feat.cli": "<b>デイリー <code>--notice</code> CLI</b> — Windows タスクスケジューラ、cron、ログインスクリプト向け。",
+
+      "h2.preview": "プレビュー",
+      "preview.p": "稼働中のノティスパネル — 更新の投稿、体験版警告、日替わりの顔文字を備えた適応型テキストボード。",
+      "preview.board": `────────────────────────────────────────
+           【週間】更新予定スレ
+────────────────────────────────────────
+
+1 ：OL ：2026-05-28(木) ID:66e347b3
+Spotify 今日更新!
+他1件
+ｷﾀ━━━(ﾟ∀ﾟ)━━━!!
+────────────────────────────────────────
+
+2 ：OL ：2026-05-29(金) ID:e0130a8d
+今日は更新なし
+( ´∀｀)
+────────────────────────────────────────
+
+3 ：OL ：2026-05-30(土) ID:22174871
+Pixiv Premium 今日更新!
+Σ(ﾟДﾟ)
+────────────────────────────────────────
+
+4 ：OL ：2026-06-02(火) ID:dea2b7ff
+NewApp Beta 体験版終了!
+(((;ﾟДﾟ)))
+────────────────────────────────────────
+
+           〜 終 〜`,
+
+      "h2.keys": "キー操作",
+      "keys.editing": "編集",
+      "keys.views": "表示",
+      "keys.screens": "画面",
+      "keys.app": "アプリ",
+      "key.add": "追加",
+      "key.edit": "編集",
+      "key.delete": "削除(解約)",
+      "key.duplicate": "複製",
+      "key.advance": "更新済み・進めて記録",
+      "key.undo": "直前の <kbd>k</kbd> を取り消し",
+      "key.notes": "メモ",
+      "key.filter": "絞り込み",
+      "key.grossnet": "税込/税抜",
+      "key.paused": "停止中",
+      "key.archive": "アーカイブ",
+      "key.resume": "再開(解約取り消し)",
+      "key.sort": "並べ替えサイクル",
+      "key.totals": "合計サイクル",
+      "key.convert": "換算カラム",
+      "key.history": "履歴",
+      "key.notices": "通知 ↔ チュートリアル",
+      "key.settings": "設定",
+      "key.export": "書き出し",
+      "key.import": "読み込み",
+      "key.language": "言語",
+      "key.quit": "終了",
+      "key.help": "ヘルプ",
+
+      "h2.cli": "デイリー通知",
+      "cli.p": "<code>python -m gakkari --notice</code> はデータベースを読み、今日の更新と7日間のプレビューを表示して終了します。Windows タスクスケジューラ(または cron、ログインスクリプト)に登録すれば、何かを開く前に今週の更新がひと目で分かります。",
+      "cli.recipe": "<a href=\"https://github.com/kenrinzero/gakkari-ol/blob/main/docs/scheduler.md\">Windows タスクスケジューラのレシピ →</a>",
+
+      "h2.credits": "クレジット",
+      "credits.intro": "複数の AI モデルが各段階を担当し、共同で制作しました:",
+      "cr.mistral": "<b>Mistral Large 2</b> — 原案",
+      "cr.grok": "<b>Grok Imagine</b> — マスコットのキャラクターデザイン",
+      "cr.sonnet": "<b>Claude Sonnet 4.7</b> — 初期の土台とビジュアルスタイル",
+      "cr.opus46": "<b>Claude Opus 4.6</b> — 機能実装(フェーズ1〜4)",
+      "cr.opus47": "<b>Claude Opus 4.7</b> — フェーズ5〜6:CLI、レイアウト刷新、履歴画面、台帳、アーカイブ、体験版警告、並替/合計/換算サイクル、適応型ノティス、チュートリアル代替表示",
+      "cr.opus48": "<b>Claude Opus 4.8</b> — 換算カラム通貨(基準から分離)、収入合計モード、そして 0.4.0 群:支出インサイト(種別別/キャッシュアウト予測/月別履歴)、取り消し+日次バックアップ+インポートガード、支払い方法フィールド、初のテストスイート+CI",
+      "credits.license": "MIT ライセンス。ソースは <a href=\"https://github.com/kenrinzero/gakkari-ol\">GitHub</a>。",
+
+      "footer.dim": "テレメトリなし · 解析なし · このページは Cookie を使用しません"
+    };
+
+    var els = document.querySelectorAll('[data-i18n]');
+    var EN = {};
+    els.forEach(function (el) { EN[el.getAttribute('data-i18n')] = el.innerHTML; });
+    var btn = document.getElementById('lang-toggle');
+
+    function apply(lang) {
+      document.documentElement.lang = lang;
+      els.forEach(function (el) {
+        var k = el.getAttribute('data-i18n');
+        var v = (lang === 'ja') ? JA[k] : EN[k];
+        if (v != null) el.innerHTML = v;
+      });
+      btn.textContent = (lang === 'ja') ? 'EN' : '日本語';
+      try { localStorage.setItem('gakkari-lang', lang); } catch (e) {}
+    }
+
+    var saved = null;
+    try { saved = localStorage.getItem('gakkari-lang'); } catch (e) {}
+    if (saved !== 'en' && saved !== 'ja') {
+      saved = (navigator.language || '').toLowerCase().indexOf('ja') === 0 ? 'ja' : 'en';
+    }
+    btn.addEventListener('click', function () {
+      apply(document.documentElement.lang === 'ja' ? 'en' : 'ja');
+    });
+    apply(saved);
+  })();
 </script>
 
 </body>
