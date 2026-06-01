@@ -110,13 +110,19 @@ def build_notice_posts(
 ) -> list[NoticePost]:
     """Build exactly ``window`` posts for today..today+window-1.
 
-    Cancelled subs are assumed already filtered. Paused subs are included
-    (their next_renewal_date is still meaningful — the user paused but the
-    renewal cycle hasn't been changed).
+    Cancelled subs are dropped here, defensively. A cancelled sub will
+    not actually renew — its ``next_renewal_date`` is stale leftover data
+    from before the cancel — so a renewal post for it is wrong by
+    definition. The archive view (``v`` key on the main screen) is still
+    the right place to *see* cancelled rows; the notice board is the
+    "what's actually going to charge you" surface and must not include
+    them. Paused subs are kept: the user paused, but the renewal cycle
+    hasn't been changed, so the post is a useful heads-up.
     """
+    live_subs = [s for s in subs if s.status != "cancelled"]
     by_renewal: dict[date, list[Subscription]] = {}
     by_trial_end: dict[date, list[Subscription]] = {}
-    for sub in subs:
+    for sub in live_subs:
         by_renewal.setdefault(sub.next_renewal_date, []).append(sub)
         if sub.trial_ends:
             by_trial_end.setdefault(sub.trial_ends, []).append(sub)

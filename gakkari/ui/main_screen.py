@@ -1057,7 +1057,12 @@ class MainScreen(Screen):
         # days, taller ones expand up to 14.
         height = max(0, term.height - 3)
         panel.refresh_posts(
-            self._all_subs,
+            # Pass the *visible* list, not _all_subs — the notice board mirrors
+            # the same `v` archive and `p` paused toggles as the list, so a
+            # cancelled row never appears on the right when it's hidden on the
+            # left. (build_notice_posts additionally drops cancelled as a
+            # defensive backstop in case a future caller forgets.)
+            self._subs,
             date.today(),
             self._lang,
             self._notices_enabled,
