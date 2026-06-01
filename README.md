@@ -87,8 +87,9 @@ Built collaboratively with several AI models. Each contributed a distinct stage 
 - **Grok Imagine** — mascot character design
 - **Claude Sonnet 4.7** — initial scaffold and visual style
 - **Claude Opus 4.6** — feature implementation (Phases 1–4: CRUD, totals, import/export, notice board)
-- **Claude Opus 4.7** — Phases 5–6: CLI entry point, two-column restructure, history screen, auto-advance + renewal ledger, archive view, trial-expiry warnings, sort/totals/convert cycles, adaptive notice window, tutorial alt-state
-- **Claude Opus 4.8** — convert-column currency decoupled from base, income totals mode, and the 0.4.0 round: spending insights (by-category / cash-out forecast / month-grouped history), undo + daily backups + import guards, payment-method field, and the first test suite + CI
+- **Claude Opus 4.7** — Phases 5–6: CLI entry point, layout restructure, history screen, auto-advance + ledger, archive view, trial expiry, sort/totals/convert cycles, notice window, tutorial
+- **Claude Opus 4.8** — convert-column currency, income totals, 0.4.0: spending insights, undo, backups, import guards, payment-method, test suite + CI
+- **Mavis (MiniMax-M3)** — 0.4.2: notice board respects status, test coverage
 
 ## License
 
