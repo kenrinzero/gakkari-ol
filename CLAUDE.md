@@ -1,3 +1,11 @@
+<!-- Managed under atelier. -->
+
+> **Managed under atelier.** Before starting, read
+> `C:\Users\kenrin\Project\.atelier\CHARTER.md` (from WSL:
+> `/mnt/c/Users/kenrin/Project/.atelier/CHARTER.md`), the current week log in
+> `.atelier\logs\`, and this project's brief + log at
+> `.atelier\projects\coding\gakkari-ol\`. Clock out per the charter when done.
+
 # Gakkari OL
 
 Terminal subscription tracker. Python + Textual TUI, SQLite storage, local-only.
