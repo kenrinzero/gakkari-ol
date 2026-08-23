@@ -13,7 +13,7 @@ DB_PATH = Path(__file__).parent.parent / "data" / "gakkari.db"
 BACKUP_KEEP = 7  # rotating daily snapshots to retain
 
 
-def _db_path() -> Path:
+def db_path() -> Path:
     """Resolved DB path. The GAKKARI_DB env var overrides the default, letting
     tests and tooling point at an alternate DB; read at call-time so there are
     no import-order traps."""
@@ -22,7 +22,7 @@ def _db_path() -> Path:
 
 
 def _backup_dir() -> Path:
-    return _db_path().parent / "backups"
+    return db_path().parent / "backups"
 
 
 def _adapt_decimal(d: Decimal) -> str:
@@ -102,7 +102,7 @@ CREATE INDEX IF NOT EXISTS idx_renewal_log_sub ON renewal_log(subscription_id);
 
 @contextmanager
 def get_conn():
-    path = _db_path()
+    path = db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row
@@ -130,8 +130,8 @@ def backup_db(today: date | None = None) -> Path | None:
     startup continues. Returns the snapshot path if one was written, else None.
     """
     today = today or date.today()
-    db_path = _db_path()
-    if not db_path.exists():
+    path = db_path()
+    if not path.exists():
         return None  # nothing to back up yet (first run)
     try:
         backup_dir = _backup_dir()
@@ -139,7 +139,7 @@ def backup_db(today: date | None = None) -> Path | None:
         dest = backup_dir / f"gakkari-{today.isoformat()}.db"
         if dest.exists():
             return None  # already snapshotted today
-        src = sqlite3.connect(db_path)
+        src = sqlite3.connect(path)
         try:
             dst = sqlite3.connect(dest)
             try:

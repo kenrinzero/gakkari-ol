@@ -150,7 +150,7 @@ class SettingsModal(ModalScreen[Settings | None]):
             if days < 0:
                 raise ValueError
         except ValueError:
-            errors.append(t("err_amount_invalid", lang))
+            errors.append(t("err_days_invalid", lang))
             days = None
 
         # Blank monthly income means "unset" (0 → income mode shows a hint).

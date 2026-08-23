@@ -12,7 +12,7 @@ from textual.widgets import Footer, OptionList, Static
 from textual.widgets.option_list import Option
 
 from gakkari import totals
-from gakkari.currency import get_rate
+from gakkari.currency import get_rate_status
 from gakkari.db import get_conn, list_renewals, list_subscriptions, load_settings
 from gakkari.models import RenewalLog, Settings, Subscription
 from gakkari.strings import fmt_date, t
@@ -122,7 +122,7 @@ class HistoryScreen(Screen):
             return
 
         base = self._settings.base_currency
-        rates = self._rate_cache(entries, subs, base)
+        rates, stale, missing = self._rate_cache(entries, subs, base)
         total = Decimal("0")
         # Per-month subtotal + count, summed in base (entries arrive DESC).
         month_total: dict[tuple[int, int], Decimal] = {}
@@ -134,10 +134,18 @@ class HistoryScreen(Screen):
             month_total[key] = month_total.get(key, Decimal("0")) + in_base
             month_count[key] = month_count.get(key, 0) + 1
 
+        # Same freshness indicators as the main title bar — the running total
+        # can rest on a stale or never-fetched rate, and the user must see it.
+        warning = ""
+        if missing:
+            warning += f" · ⚠ {t('rate_fallback_warning', self._lang)}"
+        if stale:
+            warning += f" · ⌛ {t('rate_stale_warning', self._lang)}"
         title.update(
             t("history_title", self._lang).format(
                 count=len(entries), base=base, total=f"{total:,.2f}",
             )
+            + warning
         )
         # Current amortized monthly estimate — shown on the current month's
         # header so actual-so-far reads against what you committed to.
@@ -189,16 +197,24 @@ class HistoryScreen(Screen):
         entries: list[RenewalLog],
         subs: list[Subscription],
         base: str,
-    ) -> dict[str, Decimal]:
+    ) -> tuple[dict[str, Decimal], set[str], set[str]]:
+        """Rates to base plus the stale/missing sets, mirroring MainScreen."""
         rates: dict[str, Decimal] = {base: Decimal("1")}
+        stale: set[str] = set()
+        missing: set[str] = set()
         needed = {e.currency for e in entries if e.currency and e.currency != base}
         needed |= {s.currency for s in subs if s.currency and s.currency != base}
         if not needed:
-            return rates
+            return rates, stale, missing
         with get_conn() as conn:
             for cur in needed:
-                rates[cur] = get_rate(conn, cur, base)
-        return rates
+                rate, status = get_rate_status(conn, cur, base)
+                rates[cur] = rate
+                if status == "stale":
+                    stale.add(cur)
+                elif status == "missing":
+                    missing.add(cur)
+        return rates, stale, missing
 
     def _render_entry(
         self,

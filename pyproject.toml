@@ -1,6 +1,6 @@
 [project]
 name = "gakkari-ol"
-version = "0.4.2"
+version = "0.4.3"
 description = "Calm, local-only terminal subscription tracker — Python + Textual + SQLite."
 readme = "README.md"
 license = "MIT"

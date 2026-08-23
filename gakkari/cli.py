@@ -13,8 +13,8 @@ from datetime import date, timedelta
 
 from gakkari.db import get_conn, init_db, list_subscriptions, load_settings
 from gakkari.models import Subscription
-from gakkari.notices import _DAY_LABELS, _FACES_EMPTY, _post_id
-from gakkari.strings import fmt_period, t
+from gakkari.notices import DAY_LABELS, FACES_EMPTY, post_id
+from gakkari.strings import disp_width, fmt_period, t
 
 
 def render_notice(today: date, lang: str, subs: list[Subscription]) -> str:
@@ -27,17 +27,18 @@ def render_notice(today: date, lang: str, subs: list[Subscription]) -> str:
 
     lines: list[str] = []
 
-    day_label = _DAY_LABELS[today.weekday()]
+    day_label = DAY_LABELS[today.weekday()]
     header = (
         f"[Gakkari OL] {t('notice_thread_title', lang)} — "
         f"{today.isoformat()} ({day_label})"
     )
     lines.append(header)
-    lines.append("─" * len(header))
+    # Cell width, not char count — the header carries full-width JA glyphs.
+    lines.append("─" * disp_width(header))
     lines.append("")
 
     if today_subs:
-        lines.append(f"!! TODAY ({len(today_subs)}):")
+        lines.append(t("cli_today", lang).format(n=len(today_subs)))
         for s in today_subs:
             lines.append(
                 f"  - {s.name}  {s.currency} {s.amount:,.2f}  "
@@ -45,21 +46,21 @@ def render_notice(today: date, lang: str, subs: list[Subscription]) -> str:
             )
     else:
         # Deterministic empty-day kaomoji for flavor — same hash as the panel.
-        face = _FACES_EMPTY[int(_post_id(today, "empty"), 16) % len(_FACES_EMPTY)]
-        lines.append(f"TODAY: nothing scheduled  {face}")
+        face = FACES_EMPTY[int(post_id(today, "empty"), 16) % len(FACES_EMPTY)]
+        lines.append(f"{t('cli_today_none', lang)}  {face}")
     lines.append("")
 
     if upcoming:
-        lines.append("Upcoming (next 7 days):")
+        lines.append(t("cli_upcoming", lang))
         for s in upcoming:
             n = (s.next_renewal_date - today).days
-            day = _DAY_LABELS[s.next_renewal_date.weekday()]
+            day = DAY_LABELS[s.next_renewal_date.weekday()]
             lines.append(
                 f"  +{n}d {s.next_renewal_date.isoformat()} ({day})  "
                 f"{s.name}  {s.currency} {s.amount:,.2f}"
             )
     else:
-        lines.append("No upcoming renewals this week.")
+        lines.append(t("cli_upcoming_none", lang))
 
     return "\n".join(lines)
 

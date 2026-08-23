@@ -1,7 +1,7 @@
 """Shared pytest fixtures.
 
 The ``db`` fixture points the data layer at a throwaway SQLite file via the
-GAKKARI_DB env seam (see gakkari.db._db_path), so DB tests never touch the
+GAKKARI_DB env seam (see gakkari.db.db_path), so DB tests never touch the
 user's real data/gakkari.db.
 """
 from __future__ import annotations

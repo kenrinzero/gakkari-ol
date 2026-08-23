@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from datetime import date
 
 _STRINGS: dict[str, dict[str, str]] = {
@@ -117,6 +118,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "notice_empty_1": "No renewals today",
         "notice_empty_2": "Nothing scheduled",
         "notice_empty_3": "A quiet day",
+        # CLI (--notice) section headers
+        "cli_today": "!! TODAY ({n}):",
+        "cli_today_none": "TODAY: nothing scheduled",
+        "cli_upcoming": "Upcoming (next 7 days):",
+        "cli_upcoming_none": "No upcoming renewals this week.",
         # Settings modal
         "settings_title": "Settings",
         "settings_base_currency": "Base currency",
@@ -168,6 +174,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "err_name_required": "Name is required.",
         "err_amount_invalid": "Amount must be a valid number (e.g. 9.99).",
         "err_amount_negative": "Amount must be non-negative.",
+        "err_days_invalid": "The due-soon threshold must be a whole number of days.",
         "err_currency_invalid": "Currency must be a 3-letter code (e.g. USD).",
         "err_convert_currency_invalid": "Convert-to currency must be a 3-letter code or blank.",
         "err_income_currency_invalid": "Income currency must be a 3-letter code or blank.",
@@ -306,6 +313,11 @@ _STRINGS: dict[str, dict[str, str]] = {
         "notice_empty_1": "今日は更新なし",
         "notice_empty_2": "予定なし",
         "notice_empty_3": "静かな一日",
+        # CLI (--notice) section headers
+        "cli_today": "！！本日 ({n})：",
+        "cli_today_none": "本日：予定なし",
+        "cli_upcoming": "今後7日の更新予定：",
+        "cli_upcoming_none": "今週の更新予定はありません。",
         # Settings modal
         "settings_title": "設定",
         "settings_base_currency": "基準通貨",
@@ -357,6 +369,7 @@ _STRINGS: dict[str, dict[str, str]] = {
         "err_name_required": "名前は必須です。",
         "err_amount_invalid": "金額は有効な数値で入力してください。",
         "err_amount_negative": "金額は0以上にしてください。",
+        "err_days_invalid": "期限近通知の日数は整数で入力してください。",
         "err_currency_invalid": "通貨は3文字のコードで入力してください。",
         "err_convert_currency_invalid": "換算先通貨は3文字のコードか空欄で入力してください。",
         "err_income_currency_invalid": "収入通貨は3文字のコードか空欄で入力してください。",
@@ -415,3 +428,15 @@ def fmt_category(category: str, lang: str) -> str:
     key = f"cat_{category.lower().replace(' ', '_')}"
     result = _STRINGS.get(lang, _STRINGS["en"]).get(key)
     return result if result is not None else category
+
+
+def disp_width(s: str) -> int:
+    """Visible terminal-cell width — JA glyphs occupy two cells, ASCII one.
+
+    Python's ``len`` counts characters, which under-counts CJK width and
+    causes JA text to over-pad or under-rule when used for layout math.
+    ``East_Asian_Width`` "W"ide and "F"ullwidth glyphs are double-width;
+    ambiguous ("A") defaults to 1 to match Windows Terminal in a non-CJK
+    locale. Shared by the TUI row renderer and the --notice CLI.
+    """
+    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)

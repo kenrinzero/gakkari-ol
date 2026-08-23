@@ -53,7 +53,7 @@ gakkari/
   cli.py             Phase 5 — render today's renewals + 7-day preview for stdout
   db.py              SQLite helpers — schema, CRUD, exchange rate cache, renewal log
   models.py          Subscription, Settings, RenewalLog, _MONTHLY_FACTORS, date helpers
-  strings.py         i18n tables (EN + JA), fmt_* helpers
+  strings.py         i18n tables (EN + JA), fmt_* helpers, disp_width (cell-width math shared by TUI + CLI)
   currency.py        get_rate / get_rate_status — frankfurter.dev fetch + daily cache (fresh/stale/missing)
   io.py              CSV + JSON import/export (validates enum/domain fields on import)
   notices.py         pure logic for the rolling notice board (1–2 week window, trial expiry)

@@ -15,7 +15,7 @@ from gakkari.models import Subscription
 from gakkari.strings import t
 
 # Always-JA single-char weekday labels — preserve 2ch flavor regardless of UI lang.
-_DAY_LABELS = ("月", "火", "水", "木", "金", "土", "日")
+DAY_LABELS = ("月", "火", "水", "木", "金", "土", "日")
 
 # Period-accurate kaomoji pools (textboard research §7). Picked per post
 # by hashing the post_id, so the same day always reads the same face — no
@@ -28,7 +28,7 @@ _FACES_RENEWAL = (
     "(゜∀゜)",
 )
 
-_FACES_EMPTY = (
+FACES_EMPTY = (
     "(´_ゝ｀)",
     "(´・ω・｀)",
     "( ´_ゝ｀)ﾌｰﾝ",
@@ -48,7 +48,7 @@ _FACES_TRIAL = (
 
 # Representative single faces — kept for any caller that wants a default.
 FACE_SHOCK = _FACES_RENEWAL[0]
-FACE_CALM = _FACES_EMPTY[0]
+FACE_CALM = FACES_EMPTY[0]
 
 _EMPTY_KEYS = ("notice_empty_1", "notice_empty_2", "notice_empty_3")
 
@@ -69,7 +69,9 @@ class NoticePost:
     is_renewal: bool
 
 
-def _post_id(d: date, body: str) -> str:
+def post_id(d: date, body: str) -> str:
+    """Stable 8-hex id for a (date, body) pair. Public: the --notice CLI
+    hashes with the same function so its empty-day face matches the panel's."""
     raw = f"{d.isoformat()}|{body}".encode("utf-8")
     return hashlib.md5(raw).hexdigest()[:8]
 
@@ -96,7 +98,7 @@ def _trial_body(name: str, lang: str) -> str:
 
 def _empty_body(d: date, lang: str) -> str:
     # Deterministic pick by date so the same day always reads the same.
-    seed = _post_id(d, "empty")
+    seed = post_id(d, "empty")
     pool = [t(k, lang) for k in _EMPTY_KEYS]
     return pool[int(seed, 16) % len(pool)]
 
@@ -158,15 +160,15 @@ def build_notice_posts(
             is_renewal = True
         else:
             body = _empty_body(d, lang)
-            face_pool = _FACES_EMPTY
+            face_pool = FACES_EMPTY
             is_renewal = False
-        pid = _post_id(d, body)
+        pid = post_id(d, body)
         face = face_pool[int(pid, 16) % len(face_pool)]
         posts.append(
             NoticePost(
                 post_no=i + 1,
                 date=d,
-                day_label=_DAY_LABELS[d.weekday()],
+                day_label=DAY_LABELS[d.weekday()],
                 post_id=pid,
                 body=body,
                 face=face,

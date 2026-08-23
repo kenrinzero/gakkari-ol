@@ -15,10 +15,11 @@ from gakkari.db import (
     insert_subscription,
     list_renewals,
     list_subscriptions,
+    load_settings,
     update_subscription,
     upsert_rate,
 )
-from gakkari.models import Subscription
+from gakkari.models import Settings, Subscription
 
 
 def make(**kw) -> Subscription:
@@ -95,3 +96,37 @@ def test_backup_create_skip_prune(db):
     snaps = sorted(_backup_dir().glob("gakkari-*.db"))
     assert len(snaps) == 7
     assert snaps[-1].name == "gakkari-2026-05-30.db"
+
+
+# ── Defaults parity: SCHEMA (db.py) ↔ dataclasses (models.py) ──────────
+# The same defaults are declared in two places; these tests pin them
+# together so a change on one side cannot silently drift from the other
+# (AUDIT-2026-08-23.md, entry 2a).
+
+
+def test_settings_schema_defaults_match_dataclass(db):
+    # init_db (via the fixture) inserts the settings row with SCHEMA
+    # defaults; it must read back exactly equal to a fresh Settings().
+    with get_conn() as c:
+        assert load_settings(c) == Settings(id=1)
+
+
+def test_subscription_schema_defaults_match_dataclass(db):
+    with get_conn() as c:
+        c.execute(
+            "INSERT INTO subscriptions (name, amount, next_renewal_date) "
+            "VALUES (?, ?, ?)",
+            ("bare", Decimal("1"), date(2026, 6, 1)),
+        )
+    with get_conn() as c:
+        row = list_subscriptions(c, statuses=("active",))[0]
+    expected = Subscription(
+        name="bare",
+        amount=Decimal("1"),
+        currency=row.currency,  # schema-only default; no dataclass counterpart
+        billing_period=row.billing_period,  # same
+        next_renewal_date=date(2026, 6, 1),
+    )
+    for f in ("category", "notes", "tax_mode", "tax_rate", "status",
+              "trial_ends", "payment_method"):
+        assert getattr(row, f) == getattr(expected, f), f

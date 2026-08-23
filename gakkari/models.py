@@ -23,6 +23,15 @@ _MONTHLY_FACTORS: dict[str, Decimal] = {
     "half_yearly": Decimal("1") / 6,
 }
 
+# One billing cycle expressed in months, for next_renewal_after. Weekly is
+# handled separately (7 days); unknown periods degrade to monthly.
+_PERIOD_MONTHS: dict[str, int] = {
+    "monthly": 1,
+    "quarterly": 3,
+    "half_yearly": 6,
+    "yearly": 12,
+}
+
 
 @dataclass
 class Subscription:
@@ -56,8 +65,6 @@ class Subscription:
     def gross_amount(self) -> Decimal:
         if self.tax_mode == "exclusive" and self.tax_rate:
             return self.amount * (1 + self.tax_rate / 100)
-        if self.tax_mode == "inclusive":
-            return self.amount
         return self.amount
 
     def display_amount(self, mode: str) -> Decimal:
@@ -76,16 +83,8 @@ class Subscription:
         d = from_date or self.next_renewal_date
         if self.billing_period == "weekly":
             return d + timedelta(days=7)
-        if self.billing_period == "monthly":
-            return _add_months(d, 1)
-        if self.billing_period == "quarterly":
-            return _add_months(d, 3)
-        if self.billing_period == "half_yearly":
-            return _add_months(d, 6)
-        if self.billing_period == "yearly":
-            return _add_months(d, 12)
-        # Unknown period — degrade to monthly to avoid crashing.
-        return _add_months(d, 1)
+        # Unknown periods degrade to monthly to avoid crashing.
+        return _add_months(d, _PERIOD_MONTHS.get(self.billing_period, 1))
 
 
 def _add_months(d: date, months: int) -> date:

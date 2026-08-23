@@ -79,14 +79,14 @@ class ImportModal(ModalScreen[Path | None]):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "ok":
-            self._submit()
+            self._save()
         else:
             self.dismiss(None)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
 
-    def _submit(self) -> None:
+    def _save(self) -> None:
         path_str = self.query_one("#path", Input).value.strip()
         if not path_str:
             return

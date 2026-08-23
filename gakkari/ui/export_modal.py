@@ -9,7 +9,7 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, Input, Label, Select
 
-from gakkari.db import _db_path
+from gakkari.db import db_path
 from gakkari.strings import t
 
 
@@ -17,7 +17,7 @@ def _default_path(fmt: str) -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     # Resolve through the GAKKARI_DB seam so the suggested export dir tracks the
     # DB actually in use, not just the default data/ dir.
-    return _db_path().parent / f"gakkari_export_{stamp}.{fmt}"
+    return db_path().parent / f"gakkari_export_{stamp}.{fmt}"
 
 
 class ExportModal(ModalScreen[tuple[str, Path] | None]):

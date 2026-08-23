@@ -90,6 +90,7 @@ Built collaboratively with several AI models. Each contributed a distinct stage 
 - **Claude Opus 4.7** — Phases 5–6: CLI entry point, layout restructure, history screen, auto-advance + ledger, archive view, trial expiry, sort/totals/convert cycles, notice window, tutorial
 - **Claude Opus 4.8** — convert-column currency, income totals, 0.4.0: spending insights, undo, backups, import guards, payment-method, test suite + CI
 - **Mavis (MiniMax-M3)** — 0.4.2: notice board respects status, test coverage
+- **Qwen (Qwen3.8-Max)** — 0.4.3: first full code audit (`AUDIT-2026-08-23.md`) + fix pass — rate-freshness parity, CLI display width, config single-sourcing
 
 ## License
 

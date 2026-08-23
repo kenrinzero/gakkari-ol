@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import unicodedata
 from dataclasses import replace
 from datetime import date
 from decimal import Decimal
@@ -10,6 +9,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import (
     ContentSwitcher,
@@ -34,8 +34,8 @@ from gakkari.db import (
     save_settings,
     update_subscription,
 )
-from gakkari.models import Settings, Subscription
-from gakkari.strings import fmt_category, fmt_date, fmt_period, fmt_status, t
+from gakkari.models import SORT_MODES, Settings, Subscription, TOTALS_VIEW_MODES
+from gakkari.strings import disp_width, fmt_category, fmt_date, fmt_period, fmt_status, t
 from gakkari.ui.confirm_modal import ConfirmModal
 from gakkari.ui.export_modal import ExportModal
 from gakkari.ui.history_screen import HistoryScreen
@@ -46,28 +46,10 @@ from gakkari.ui.subscription_modal import SubscriptionModal
 
 LINE_WIDTH_FALLBACK = 30
 
-_SORT_CYCLE: tuple[str, ...] = ("date", "period", "name", "amount")
-_TOTALS_CYCLE: tuple[str, ...] = (
-    "estimate",
-    "monthly_strict",
-    "yearly_strict",
-    "by_period",
-    "by_category",
-    "forecast",
-    "income",
-)
-
-
-def _disp_width(s: str) -> int:
-    """Visible terminal-cell width — JA glyphs occupy two cells, ASCII one.
-
-    Python's ``len`` counts characters, which under-counts CJK width and
-    caused JA entries to over-pad and push right-aligned content past the
-    panel border. ``East_Asian_Width`` "W"ide and "F"ullwidth glyphs are
-    double-width; ambiguous ("A") defaults to 1 to match Windows Terminal
-    in a non-CJK locale.
-    """
-    return sum(2 if unicodedata.east_asian_width(c) in ("W", "F") else 1 for c in s)
+# Mirrors the CSS 60:40 split (#right-panel { width: 40% }) — keep in sync.
+# Used to derive the panel's inner width from the terminal size, because
+# widget.content_size lags during resize transitions.
+_RIGHT_PANEL_RATIO = 0.40
 
 
 class MainScreen(Screen):
@@ -381,7 +363,8 @@ class MainScreen(Screen):
             ol = self.query_one("#list-view", OptionList)
             w = ol.size.width - 2
             return w if w > 10 else LINE_WIDTH_FALLBACK
-        except Exception:
+        except NoMatches:
+            # A resize can land before compose() has built the list view.
             return LINE_WIDTH_FALLBACK
 
     def _rebuild_list(self) -> None:
@@ -565,7 +548,7 @@ class MainScreen(Screen):
                 conv = sub.display_amount(mode) * rate
                 conv_str = f"  ≈ {conv:,.2f} {target}"
         right1 = amount_str + conv_str + notes_dot
-        pad1 = max(1, w - _disp_width(name) - _disp_width(right1))
+        pad1 = max(1, w - disp_width(name) - disp_width(right1))
         text.append(name, style="bold #FF8C00")
         text.append(" " * pad1)
         text.append(amount_str, style="#FFB000")
@@ -590,7 +573,7 @@ class MainScreen(Screen):
                 right2 = f"⚠ {days}{t('due_days', self._lang)}"
         else:
             right2 = ""
-        pad2 = max(1, w - _disp_width(left2) - _disp_width(right2))
+        pad2 = max(1, w - disp_width(left2) - disp_width(right2))
         text.append(left2, style="#CC6600")
         text.append(" " * pad2)
         if right2:
@@ -601,7 +584,7 @@ class MainScreen(Screen):
         if sub.payment_method:
             cat_str += f" · {sub.payment_method}"
         status_str = fmt_status(sub.status, self._lang)
-        pad3 = max(1, w - _disp_width(cat_str) - _disp_width(status_str))
+        pad3 = max(1, w - disp_width(cat_str) - disp_width(status_str))
         text.append(cat_str, style="#554400")
         text.append(" " * pad3)
         text.append(status_str, style="#554400")
@@ -685,13 +668,14 @@ class MainScreen(Screen):
         if sub is None or sub.status == "cancelled" or sub.id is None:
             return
         old_date = sub.next_renewal_date
-        sub.next_renewal_date = sub.next_renewal_after(old_date)
+        new_date = sub.next_renewal_after(old_date)
         # Log the renewal at the *old* date — that's when the charge happened.
         # The amount stored is whatever the user is currently being billed
         # (display_amount picks net/gross per current mode).
         renewal_amount = sub.display_amount(self._settings.price_display_mode)
+        # Persist first: on a DB failure the in-memory sub stays untouched.
         with get_conn() as conn:
-            update_subscription(conn, sub)
+            update_subscription(conn, replace(sub, next_renewal_date=new_date))
             log_id = insert_renewal(
                 conn,
                 subscription_id=sub.id,
@@ -700,15 +684,16 @@ class MainScreen(Screen):
                 currency=sub.currency,
                 billing_period=sub.billing_period,
             )
+        sub.next_renewal_date = new_date
         # Stash for a single-level undo (`u`). Overwriting here means undo only
         # ever targets the genuinely-last advance.
-        self._last_advance = (sub.id, old_date, sub.next_renewal_date, log_id)
+        self._last_advance = (sub.id, old_date, new_date, log_id)
         self._load_subs()
         self.notify(
             t("advance_notify", self._lang).format(
                 name=sub.name,
                 old=fmt_date(old_date, self._lang),
-                new=fmt_date(sub.next_renewal_date, self._lang),
+                new=fmt_date(new_date, self._lang),
             )
             + f"  ({t('undo_hint', self._lang)})",
             timeout=4,
@@ -748,9 +733,10 @@ class MainScreen(Screen):
         )
         if confirmed:
             prev_idx = self.query_one("#list-view", OptionList).highlighted
-            sub.status = "cancelled"
+            # Persist first: on a DB failure the in-memory sub stays untouched.
             with get_conn() as conn:
-                update_subscription(conn, sub)
+                update_subscription(conn, replace(sub, status="cancelled"))
+            sub.status = "cancelled"
             self._load_subs()
             option_list = self.query_one("#list-view", OptionList)
             if self._subs:
@@ -764,10 +750,11 @@ class MainScreen(Screen):
         sub = self._current_sub()
         if sub is None or sub.status != "cancelled":
             return
-        sub.status = "active"
         prev_idx = self.query_one("#list-view", OptionList).highlighted
+        # Persist first: on a DB failure the in-memory sub stays untouched.
         with get_conn() as conn:
-            update_subscription(conn, sub)
+            update_subscription(conn, replace(sub, status="active"))
+        sub.status = "active"
         self._load_subs()
         option_list = self.query_one("#list-view", OptionList)
         if self._subs:
@@ -888,15 +875,17 @@ class MainScreen(Screen):
 
     def action_cycle_sort(self) -> None:
         cur = self._settings.sort_mode
-        idx = _SORT_CYCLE.index(cur) if cur in _SORT_CYCLE else 0
-        self._settings.sort_mode = _SORT_CYCLE[(idx + 1) % len(_SORT_CYCLE)]
+        idx = SORT_MODES.index(cur) if cur in SORT_MODES else 0
+        self._settings.sort_mode = SORT_MODES[(idx + 1) % len(SORT_MODES)]
         self._persist_settings()
         self._refresh_view()
 
     def action_cycle_totals(self) -> None:
         cur = self._settings.totals_view_mode
-        idx = _TOTALS_CYCLE.index(cur) if cur in _TOTALS_CYCLE else 0
-        self._settings.totals_view_mode = _TOTALS_CYCLE[(idx + 1) % len(_TOTALS_CYCLE)]
+        idx = TOTALS_VIEW_MODES.index(cur) if cur in TOTALS_VIEW_MODES else 0
+        self._settings.totals_view_mode = TOTALS_VIEW_MODES[
+            (idx + 1) % len(TOTALS_VIEW_MODES)
+        ]
         self._persist_settings()
         self._update_title()
 
@@ -1045,13 +1034,14 @@ class MainScreen(Screen):
     def _refresh_notice_panel(self) -> None:
         try:
             panel = self.query_one("#right-panel", NoticePanel)
-        except Exception:
+        except NoMatches:
+            # A resize can land before compose() has built the panel.
             return
         # Derive inner width from the terminal size (widget.content_size
         # lags during resize transitions).
         term = self.app.size
         # 40% column minus 2 cols of border minus 2 cols of horizontal padding.
-        width = max(20, int(term.width * 0.40) - 4)
+        width = max(20, int(term.width * _RIGHT_PANEL_RATIO) - 4)
         # Inner height = full screen minus border (2) minus footer (1). Notice
         # panel uses this to decide window size — short terminals stay at 7
         # days, taller ones expand up to 14.
